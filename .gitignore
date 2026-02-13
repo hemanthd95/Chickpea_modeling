@@ -1,0 +1,83 @@
+# ----------------------------
+# Large remote sensing / hyperspectral data
+# ----------------------------
+*.tif
+*.tiff
+*.img
+*.hdr
+*.bil
+*.bip
+*.bsq
+*.raw
+*.dat
+*.h5
+*.hdf5
+*.nc
+*.npy
+*.npz
+*.zarr
+*.pix
+*.envi
+*.sav
+
+# Common imagery formats (if large)
+*.jp2
+
+# LiDAR / point clouds
+*.las
+*.laz
+
+# Archives
+*.zip
+*.7z
+*.tar
+*.gz
+*.rar
+
+# ----------------------------
+# Data directories (adjust to your structure)
+# ----------------------------
+data/
+Data/
+raw/
+raw_data/
+Raw/
+datasets/
+Datasets/
+images/
+Imagery/
+hyperspectral/
+Hyperspectral/
+outputs/
+output/
+results/
+Results/
+runs/
+logs/
+
+# ----------------------------
+# Python / notebooks
+# ----------------------------
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Environments
+.venv/
+venv/
+env/
+conda_env/
+*.conda
+
+# ML checkpoints
+*.ckpt
+*.pth
+*.pt
+*.h5
+*.joblib
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
