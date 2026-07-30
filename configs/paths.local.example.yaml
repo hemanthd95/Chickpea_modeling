@@ -1,0 +1,14 @@
+project_root: /home/hemanthd95/Chickpea_modeling
+field1:
+  derived_ssl: /home/hemanthd95/Chickpea_modeling/data/Kusi_interns/Masks for modelling/Training_data_for_ss_model
+  label_csvs: /home/hemanthd95/Chickpea_modeling/data/Kusi_interns/Training_Testing_Data
+  masks_emmanuel: /home/hemanthd95/Chickpea_modeling/data/Kusi_interns/Masks for modelling/Emmanuel_completed
+  reflectance_dates:
+    "2025-06-06": /home/hemanthd95/Chickpea_modeling/data/Kusi_interns/6_6_2025
+    "2025-06-15": /home/hemanthd95/Chickpea_modeling/data/Kusi_interns/6_15_2025
+    "2025-06-23": /home/hemanthd95/Chickpea_modeling/data/Kusi_interns/6_23_2025
+    "2025-06-30": /home/hemanthd95/Chickpea_modeling/data/Kusi_interns/6_30_2025
+field2:
+  imagery: ""
+  tall_grass_rtk: ""
+  locked: true
