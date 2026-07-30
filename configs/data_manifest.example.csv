@@ -1,3 +1,2 @@
-cube_id,field_id,pca,deriv1,deriv2,ndvi,mask_chickpea,mask_weed,mask_soil,tall_grass_points,alley_mask
-field1_cube45,field1,/absolute/path/pca.bip,/absolute/path/deriv1.bip,/absolute/path/deriv2.bip,/absolute/path/ndvi.bip,/absolute/path/chickpea_mask.tif,/absolute/path/weed_mask.tif,/absolute/path/soil_mask.tif,/absolute/path/tall_grass.gpkg,/absolute/path/alley_mask.tif
-
+cube_id,field_id,reflectance,pca,deriv1,deriv2,ndvi,mask_combined,mask_chickpea,mask_weed,mask_soil,tall_grass_points,alley_mask
+field1_cube45,field1,/absolute/path/reflectance.bip,/absolute/path/pca.bip,/absolute/path/deriv1.bip,/absolute/path/deriv2.bip,/absolute/path/ndvi.bip,/absolute/path/combined_mask.tif,,,,/absolute/path/tall_grass.gpkg,/absolute/path/alley_mask.tif
