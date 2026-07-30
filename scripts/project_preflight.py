@@ -21,10 +21,39 @@ ALLOWED_SUFFIXES = {
 def infer_cube_id(text: str) -> str:
     normalized = text.lower()
     field = re.search(r"field\s*[_-]?(\d+)", normalized)
-    unit = re.search(r"(?:cube|plot)\s*[_-]?(\d+)", normalized)
+    unit = re.search(r"(?:cube|plot|gige)\s*[_-]?(\d+)", normalized)
     if field and unit:
         return f"field{field.group(1)}_cube{unit.group(1)}"
     return f"cube{unit.group(1)}" if unit else ""
+
+
+def infer_file_role(path: Path, source: str) -> str:
+    name = path.name.lower()
+    if source == "field1.reflectance":
+        if "-mask" in name:
+            return "source_mask_bip" if path.suffix.lower() != ".hdr" else "source_mask_header"
+        return "reflectance_bip" if path.suffix.lower() != ".hdr" else "reflectance_header"
+    if source == "field1.label_csvs":
+        return "label_table"
+    if source == "field1.masks_emmanuel":
+        if "combined" in name:
+            return "combined_mask"
+        if "chickpea" in name:
+            return "chickpea_mask"
+        if "weed" in name:
+            return "weed_mask"
+        if "soil" in name:
+            return "soil_mask"
+        return "mask_support"
+    if "second" in name and "deriv" in name:
+        return "legacy_pca_second_difference"
+    if "first" in name and "deriv" in name:
+        return "legacy_pca_first_difference"
+    if "ndvi" in name or "nvdi" in name:
+        return "ndvi"
+    if "pca" in name:
+        return "pca"
+    return "derived_support"
 
 
 def lightweight_fingerprint(path: Path) -> str:
@@ -51,6 +80,7 @@ def inventory(root: Path, source: str, date: str = "") -> list[dict[str, object]
             "source": source,
             "acquisition_date": date,
             "cube_id_inferred": infer_cube_id(str(path.relative_to(root))),
+            "file_role": infer_file_role(path, source),
             "relative_path": str(path.relative_to(root)),
             "extension": path.suffix.lower(),
             "size_bytes": path.stat().st_size,
@@ -95,6 +125,31 @@ def main() -> None:
     )
     summary.to_csv(output_dir / "catalog_summary.csv", index=False)
 
+    duplicates = catalog[catalog.duplicated("fingerprint", keep=False)].sort_values(
+        ["fingerprint", "source", "relative_path"]
+    )
+    duplicates.to_csv(output_dir / "catalog_duplicates.csv", index=False)
+
+    coverage_source = (
+        catalog[catalog["cube_id_inferred"].ne("")]
+        .assign(present=1)
+        .pivot_table(
+            index="cube_id_inferred", columns="source", values="present",
+            aggfunc="max", fill_value=0,
+        )
+        .reset_index()
+    )
+    role_counts = (
+        catalog[catalog["cube_id_inferred"].ne("")]
+        .pivot_table(
+            index="cube_id_inferred", columns="file_role",
+            values="relative_path", aggfunc="count", fill_value=0,
+        )
+        .reset_index()
+    )
+    coverage = coverage_source.merge(role_counts, on="cube_id_inferred", how="outer")
+    coverage.to_csv(output_dir / "cube_coverage.csv", index=False)
+
     print(f"Python: {platform.python_version()}")
     print(f"PyTorch: {torch.__version__}")
     print(f"CUDA available: {torch.cuda.is_available()}")
@@ -104,6 +159,9 @@ def main() -> None:
     print(f"Cataloged {len(catalog)} observed Field 1 files.")
     print(f"Catalog: {output_dir / 'project_catalog.csv'}")
     print(f"Summary: {output_dir / 'catalog_summary.csv'}")
+    print(f"Coverage: {output_dir / 'cube_coverage.csv'}")
+    print(f"Duplicate candidates: {output_dir / 'catalog_duplicates.csv'}")
+    print(f"Duplicate-file rows requiring review: {len(duplicates)}")
     print("Field 2 remains locked and was not inventoried.")
 
 
