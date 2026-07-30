@@ -2,7 +2,9 @@
 
 This repository tests whether self-supervised learning (SSL) can discover stable,
 spectrally and spatially distinct subgroups inside manually labelled weed pixels
-from UAV Resonon Pika-L imagery.
+from UAV Resonon Pika-L imagery. All reported experiments use only the project's
+observed imagery, masks, tables, and RTK observations. Synthetic observations are
+not permitted in training, validation, testing, or reported results.
 
 ## Scientific scope
 
@@ -30,22 +32,30 @@ cd /home/hemanthd95/Chickpea_modeling
 conda env update -n chickpea_modeling -f environment.yml
 conda activate chickpea_modeling
 
-python scripts/inventory_data.py \
-  --root "/home/hemanthd95/Chickpea_modeling/data/Kusi_interns/Masks for modelling/Training_data_for_ss_model" \
-  --output configs/data_manifest.csv
-
-python scripts/validate_manifest.py --manifest configs/data_manifest.csv
-
-python scripts/inspect_manifest.py \
-  --manifest configs/data_manifest.csv \
-  --output configs/data_inspection.csv
+cp configs/paths.local.example.yaml configs/paths.local.yaml
+# Review paths.local.yaml, then:
+python scripts/project_preflight.py --paths configs/paths.local.yaml
 ```
 
-Open `configs/data_manifest.csv` and correct any file roles that could not be
-resolved from filenames. Each row is one cube; paths for PCA, first derivative,
-second derivative, NDVI, and either a combined categorical mask or three binary
-masks must refer to the same spatial footprint. `reflectance` is optional in the
-initial experiment and reserved for the later full-band comparison.
+The preflight writes local inventories to `metadata/local/`. Review those reports
+before model training. Files under `metadata/local/` contain workstation paths and
+are intentionally not versioned.
+
+## Experimental boundary
+
+- **Field 1:** development, spatially blocked cross-validation, supervised
+  baselines, SSL fitting, and model selection.
+- **Field 2:** locked external field. Its RTK tall-grass coordinates are not used
+  until the Field 1 pipeline is frozen.
+- **Primary inputs:** calibrated/georectified 150-band reflectance and wavelength
+  metadata.
+- **Derived baseline:** PCA and NDVI.
+- **Legacy ablation only:** first/second differences calculated across PCA
+  components. Component order represents explained variance rather than
+  wavelength, so these are not interpreted as spectral derivatives.
+
+See `docs/study_protocol.md` for the preregistered analysis logic and
+`docs/progress_log.md` for the daily record.
 
 Then run the leakage-safe starter experiment:
 
@@ -74,5 +84,7 @@ The original denoising autoencoder was a useful proof of concept, but:
 - A globally pooled reconstruction bottleneck can favor scene appearance over
   fine spectral differences.
 - Median filtering can inflate apparent spatial coherence.
+- Differences between ordered PCA components are not physically interpretable as
+  wavelength derivatives.
 
 The new framework treats those items as explicit controls.
