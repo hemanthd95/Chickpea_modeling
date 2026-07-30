@@ -1,0 +1,25 @@
+name: chickpea_modeling
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pytorch>=2.4
+  - torchvision
+  - pytorch-cuda=12.4
+  - numpy
+  - pandas
+  - scipy
+  - scikit-learn
+  - rasterio
+  - spectral
+  - pyyaml
+  - matplotlib
+  - seaborn
+  - tqdm
+  - pip
+  - pip:
+      - hdbscan
+      - kneed
+
