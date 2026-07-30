@@ -35,12 +35,17 @@ python scripts/inventory_data.py \
   --output configs/data_manifest.csv
 
 python scripts/validate_manifest.py --manifest configs/data_manifest.csv
+
+python scripts/inspect_manifest.py \
+  --manifest configs/data_manifest.csv \
+  --output configs/data_inspection.csv
 ```
 
 Open `configs/data_manifest.csv` and correct any file roles that could not be
 resolved from filenames. Each row is one cube; paths for PCA, first derivative,
-second derivative, NDVI, and the three masks must refer to the same spatial
-footprint.
+second derivative, NDVI, and either a combined categorical mask or three binary
+masks must refer to the same spatial footprint. `reflectance` is optional in the
+initial experiment and reserved for the later full-band comparison.
 
 Then run the leakage-safe starter experiment:
 
@@ -71,4 +76,3 @@ The original denoising autoencoder was a useful proof of concept, but:
 - Median filtering can inflate apparent spatial coherence.
 
 The new framework treats those items as explicit controls.
-
