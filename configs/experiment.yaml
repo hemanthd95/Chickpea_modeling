@@ -1,12 +1,14 @@
 seed: 42
 data:
-  manifest: configs/data_manifest.csv
+  manifest: metadata/local/field1_manifest.csv
   patch_size: 15
-  channels: [pca, deriv1, deriv2, ndvi]
+  channels: [reflectance]
   vegetation_only: true
   cluster_target: weed
-  split_group: field_id
+  split_group: spatial_block
   valid_fraction: 0.2
+  synthetic_data_allowed: false
+  field2_locked: true
 model:
   method: simclr
   encoder: resnet18
@@ -27,5 +29,5 @@ validation:
   supervised_labels: [soil, chickpea, weed]
   external_class: tall_grass
   bootstrap_repeats: 1000
+  reveal_field2_labels_after_freeze: true
 output_dir: results/ssl_baseline
-
