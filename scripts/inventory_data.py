@@ -12,14 +12,16 @@ import pandas as pd
 ROLES = {
     "deriv2": (r"second.?deriv", r"deriv.?2", r"\bsd\b"),
     "deriv1": (r"first.?deriv", r"deriv.?1", r"\bfd\b"),
-    "ndvi": (r"ndvi",),
+    "ndvi": (r"ndvi", r"nvdi"),
+    "mask_combined": (r"combined.*mask", r"mask.*combined"),
     "mask_chickpea": (r"chickpea.*mask", r"mask.*chickpea"),
     "mask_weed": (r"weed.*mask", r"mask.*weed"),
     "mask_soil": (r"soil.*mask", r"mask.*soil"),
     "alley_mask": (r"alley.*mask", r"mask.*alley"),
     "pca": (r"pca",),
+    "reflectance": (r"georectify",),
 }
-SUPPORTED = {".bip", ".bil", ".bsq", ".hdr", ".tif", ".tiff", ".npy", ".npz"}
+SUPPORTED = {".bip", ".bil", ".bsq", ".tif", ".tiff", ".npy", ".npz"}
 
 
 def role_for(path: Path) -> str | None:
@@ -30,17 +32,21 @@ def role_for(path: Path) -> str | None:
     return None
 
 
-def cube_key(path: Path) -> str:
-    name = path.stem.lower()
-    tokens = (
-        "pca_transform", "secondderivative", "second_derivative",
-        "firstderivative", "first_derivative", "deriv1", "deriv2",
-        "chickpea_mask", "weed_mask", "soil_mask", "ndvi", "pca",
-    )
-    for token in tokens:
-        name = name.replace(token, "")
-    name = re.sub(r"[^a-z0-9]+", "_", name).strip("_")
-    return name or path.parent.name.lower().replace(" ", "_")
+def normalized_cube_id(path: Path, root: Path) -> str:
+    """Group all products in a cube directory into one manifest row."""
+    relative_parent = path.parent.relative_to(root)
+    folder = relative_parent.parts[-1] if relative_parent.parts else path.parent.name
+    text = f"{folder}_{path.stem}".lower()
+    field = re.search(r"field\s*[_-]?(\d+)", text)
+    unit = re.search(r"(?:cube|plot)\s*[_-]?(\d+)", text)
+    if field and unit:
+        return f"field{field.group(1)}_cube{unit.group(1)}"
+    return re.sub(r"[^a-z0-9]+", "_", folder.lower()).strip("_")
+
+
+def inferred_field_id(cube_id: str) -> str:
+    match = re.match(r"(field\d+)", cube_id)
+    return match.group(1) if match else ""
 
 
 def main() -> None:
@@ -61,17 +67,19 @@ def main() -> None:
         if role is None:
             unresolved.append(str(path.resolve()))
             continue
-        key = cube_key(path)
-        row = rows.setdefault(key, {"cube_id": key, "field_id": ""})
+        key = normalized_cube_id(path, args.root)
+        row = rows.setdefault(
+            key, {"cube_id": key, "field_id": inferred_field_id(key)}
+        )
         if role in row:
             row[f"duplicate_{role}"] = f"{row[role]} | {path.resolve()}"
         else:
             row[role] = str(path.resolve())
 
     columns = [
-        "cube_id", "field_id", "pca", "deriv1", "deriv2", "ndvi",
-        "mask_chickpea", "mask_weed", "mask_soil", "tall_grass_points",
-        "alley_mask",
+        "cube_id", "field_id", "reflectance", "pca", "deriv1", "deriv2",
+        "ndvi", "mask_combined", "mask_chickpea", "mask_weed", "mask_soil",
+        "tall_grass_points", "alley_mask",
     ]
     frame = pd.DataFrame(rows.values())
     for column in columns:
@@ -91,4 +99,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
