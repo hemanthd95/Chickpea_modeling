@@ -264,6 +264,19 @@ corrections.
   fold components receive a strong penalty. The output remains review-only until
   its numeric summary and PNG are approved.
 
+### Candidate spatial folds accepted for contract materialization
+
+- The 110° candidate produces five single-component contiguous folds. Chickpea
+  allocation is 17.87–22.44% per fold (221,294–277,919 observations), and total
+  labeled allocation is 18.13–22.16% per fold.
+- Soil allocation ranges from 13.36% to 25.63% and weed from 16.36% to 24.70%.
+  This remaining compositional heterogeneity is retained as a realistic spatial
+  generalization challenge rather than erased by noncontiguous reassignment.
+- Added explicit acceptance gates and a contract-materialization script. The
+  frozen local contract records assignment, boundary, configuration, and input
+  hashes and preserves the reviewed PNG. The 0.30 m boundary exclusion remains a
+  sampling-stage rule, not a relabeling operation.
+
 ## 2026-07-30
 
 ### Completed
