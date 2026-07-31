@@ -69,7 +69,8 @@ def lightweight_fingerprint(path: Path) -> str:
     return digest.hexdigest()
 
 
-def inventory(root: Path, source: str, date: str = "") -> list[dict[str, object]]:
+def inventory(root: Path, source: str, acquisition_date: str = "",
+              processing_batch: str = "") -> list[dict[str, object]]:
     if not root.is_dir():
         raise FileNotFoundError(f"{source} directory not found: {root}")
     rows: list[dict[str, object]] = []
@@ -78,7 +79,8 @@ def inventory(root: Path, source: str, date: str = "") -> list[dict[str, object]
             continue
         rows.append({
             "source": source,
-            "acquisition_date": date,
+            "acquisition_date": acquisition_date,
+            "processing_batch": processing_batch,
             "cube_id_inferred": infer_cube_id(str(path.relative_to(root))),
             "file_role": infer_file_role(path, source),
             "relative_path": str(path.relative_to(root)),
@@ -107,11 +109,13 @@ def main() -> None:
 
     rows: list[dict[str, object]] = []
     field1 = config["field1"]
-    rows.extend(inventory(Path(field1["derived_ssl"]), "field1.derived_ssl"))
-    rows.extend(inventory(Path(field1["label_csvs"]), "field1.label_csvs"))
-    rows.extend(inventory(Path(field1["masks_emmanuel"]), "field1.masks_emmanuel"))
-    for date, root in field1["reflectance_dates"].items():
-        rows.extend(inventory(Path(root), "field1.reflectance", str(date)))
+    acquisition_date = str(field1.get("acquisition_date", "2025-05-06"))
+    rows.extend(inventory(Path(field1["derived_ssl"]), "field1.derived_ssl", acquisition_date))
+    rows.extend(inventory(Path(field1["label_csvs"]), "field1.label_csvs", acquisition_date))
+    rows.extend(inventory(Path(field1["masks_emmanuel"]), "field1.masks_emmanuel", acquisition_date))
+    batches = field1.get("reflectance_processing_batches", field1.get("reflectance_dates", {}))
+    for batch, root in batches.items():
+        rows.extend(inventory(Path(root), "field1.reflectance", acquisition_date, str(batch)))
 
     if config["field2"].get("locked") is not True:
         raise SystemExit("Field 2 must remain locked during development.")
@@ -119,7 +123,7 @@ def main() -> None:
     catalog = pd.DataFrame(rows)
     catalog.to_csv(output_dir / "project_catalog.csv", index=False)
     summary = (
-        catalog.groupby(["source", "acquisition_date", "extension"], dropna=False)
+        catalog.groupby(["source", "acquisition_date", "processing_batch", "extension"], dropna=False)
         .agg(files=("relative_path", "count"), bytes=("size_bytes", "sum"))
         .reset_index()
     )
