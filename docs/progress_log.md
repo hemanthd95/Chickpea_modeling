@@ -237,6 +237,18 @@ corrections.
 - New reviewable CSVs now write beneath `metadata/local/reports/<stage>/`.
   Canonical files required by downstream scripts retain their stable locations.
 
+### Spatial edge-index correction and visual-QC policy
+
+- The first spatial index used block-centre containment and missed a valid label
+  pixel group along a rotated cube edge. No labels or source data were changed.
+- Replaced the approximation with chunked enumeration of every raster pixel
+  centre. The revised index exactly includes all blocks touched by observed
+  pixels while reading no reflectance values.
+- Added a four-panel PNG overview of labeled-cube coverage and authoritative
+  soil, chickpea, and weed fractions by 5 m group.
+- Investigator requested visual verification after each major task. Future stages
+  will include meaningful PNG QC alongside numeric reports when applicable.
+
 ## 2026-07-30
 
 ### Completed
