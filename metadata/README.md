@@ -12,6 +12,9 @@ Current report stages:
 - `spatial_grouping/`: cube footprints, overlap, group membership, and group-level
   authoritative class counts, accompanied by a PNG visual-QC overview.
 
+Accepted local analytical contracts are written to `metadata/local/contracts/`.
+Each contract includes hashes and the visual artifact reviewed by the investigator.
+
 Major analytical stages should emit a clearly named PNG preview alongside their
 tabular reports whenever spatial or statistical structure can be meaningfully
 visualized. A PNG supports investigator review but never replaces numeric QC.
