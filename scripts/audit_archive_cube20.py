@@ -73,6 +73,7 @@ def main() -> None:
     issues: list[dict[str, str]] = []
     reflectance_row, _ = raster_row(reflectance, source)
     reflectance_row["role"] = "reflectance"
+    reflectance_row["analytical_status"] = "valid_reflectance_grid"
     rows.append(reflectance_row)
     expected = (
         int(reflectance_row["width"])
@@ -101,15 +102,32 @@ def main() -> None:
     for path in candidates:
         try:
             row, array = raster_row(path, source)
+            values = {
+                int(float(value)) for value in str(row["unique_values_up_to_256"]).split("|")
+                if value != ""
+            }
+            allowed = {0, 1, 2, 3} if row["role"] == "combined" else {0, 1, 255}
+            same_grid = (
+                row["width"] == reflectance_row["width"]
+                and row["height"] == reflectance_row["height"]
+                and row["crs"] == reflectance_row["crs"]
+                and row["transform"] == reflectance_row["transform"]
+            )
+            if row["bands"] != 1 or not row["crs"] or not values.issubset(allowed):
+                row["analytical_status"] = "visualization_only"
+            elif same_grid:
+                row["analytical_status"] = "exact_reflectance_grid"
+            else:
+                row["analytical_status"] = "alternate_georeferenced_grid_needs_nearest_reprojection"
             rows.append(row)
             if array is not None:
                 arrays[str(path.relative_to(source))] = array
-            if row["width"] != reflectance_row["width"] or row["height"] != reflectance_row["height"]:
+            if row["analytical_status"] == "visualization_only":
                 issues.append({"relative_path": row["relative_path"],
-                               "issue": "dimensions_differ_from_reflectance"})
-            if row["bands"] not in (1, 3, 4):
+                               "issue": "visualization_only_not_analytical_mask"})
+            if row["nodata"] not in ("", None) and float(row["nodata"]) in values - {0}:
                 issues.append({"relative_path": row["relative_path"],
-                               "issue": "unexpected_mask_band_count"})
+                               "issue": "nodata_value_conflicts_with_foreground_value"})
         except Exception as error:
             issues.append({"relative_path": str(path.relative_to(source)),
                            "issue": f"read_error: {error}"})
@@ -117,6 +135,8 @@ def main() -> None:
     comparisons: list[dict[str, object]] = []
     for first, second in itertools.combinations(rows[1:], 2):
         if first["role"] != second["role"] or first["role"] == "unclassified":
+            continue
+        if "visualization_only" in (first["analytical_status"], second["analytical_status"]):
             continue
         a = arrays.get(str(first["relative_path"]))
         b = arrays.get(str(second["relative_path"]))
