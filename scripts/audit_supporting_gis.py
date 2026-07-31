@@ -44,10 +44,10 @@ def access_role(relative_path: str, category: str) -> str:
         or re.search(r"kusi cubes analysis trials/cube[_ -]*34_georectify", name)
     ):
         return "locked_external_validation"
-    if category == "experimental_plot_support" or re.search(
-        r"field[ _-]*1", name
-    ):
+    if re.search(r"field[ _-]*1", name):
         return "field1_development_candidate"
+    if category == "experimental_plot_support":
+        return "spatial_assignment_pending"
     return "unassigned_support"
 
 
@@ -134,8 +134,10 @@ def main() -> None:
     )
     # Only explicit Field 1 candidates are opened. Locked and unassigned records
     # cannot influence development decisions.
-    field1 = inventory[inventory["access_role"] == "field1_development_candidate"]
-    for _, row in field1[field1["extension"] == ".shp"].iterrows():
+    inspectable = inventory[inventory["access_role"].isin(
+        ["field1_development_candidate", "spatial_assignment_pending"]
+    )]
+    for _, row in inspectable[inspectable["extension"] == ".shp"].iterrows():
         relative = str(row["relative_path"])
         path = source / relative
         try:
@@ -165,7 +167,7 @@ def main() -> None:
         except Exception as error:  # report corrupt/unreadable GIS without stopping batch
             issues.append({"relative_path": relative, "issue": f"read_error: {error}"})
 
-    for _, row in field1[field1["extension"] == ".csv"].iterrows():
+    for _, row in inspectable[inspectable["extension"] == ".csv"].iterrows():
         relative = str(row["relative_path"])
         path = source / relative
         try:
@@ -192,8 +194,8 @@ def main() -> None:
     observed_plots = sorted({int(value) for value in vector["plot_id"].dropna()})
     locked_count = int((inventory["access_role"] == "locked_external_validation").sum())
     unassigned_count = int((inventory["access_role"] == "unassigned_support").sum())
-    print(f"Field 1 shapefiles inspected: {len(vector)}")
-    print(f"Field 1 CSV files inspected: {len(csv)}")
+    print(f"Candidate shapefiles inspected: {len(vector)}")
+    print(f"Candidate CSV files inspected: {len(csv)}")
     print(f"Numbered plot IDs observed: {len(observed_plots)}")
     print(f"Plot IDs: {', '.join(map(str, observed_plots))}")
     print(f"GIS/CSV issues: {len(issue_table)}")
