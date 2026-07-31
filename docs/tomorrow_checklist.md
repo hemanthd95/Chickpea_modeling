@@ -26,3 +26,12 @@ audit.
 
 Do not add Field 2 RTK coordinates to a development manifest. Do not copy raw
 imagery, masks, coordinates, model weights, or local absolute paths into Git.
+
+## Metadata QC
+
+```bash
+python scripts/run_data_qc.py --paths configs/paths.local.yaml
+```
+
+This writes `envi_qc.csv`, `mask_qc.csv`, `label_csv_qc.csv`, and
+`qc_issues.csv` under `metadata/local/` without changing the source data.
