@@ -1,0 +1,12 @@
+seed: 42
+patch_size_pixels: 15
+max_centers_per_cube_group_class: 1000
+class_names:
+  0: soil
+  1: chickpea
+  2: weed
+ssl_center_classes: [1, 2]
+weed_cluster_center_class: 2
+index_use: training_candidate_pool_only
+primary_evaluation: exhaustive_tiled_inference_on_heldout_masks
+
