@@ -4,6 +4,28 @@ Append a dated entry for every work session that changes data interpretation,
 code, experimental design, or results. Do not rewrite prior entries; append
 corrections.
 
+## 2026-07-31
+
+### Started
+
+- Reran the improved preflight successfully on the HP Z6 with both RTX 5000 Ada
+  GPUs available.
+- Confirmed 32 catalog cube IDs: 31 original reflectance cubes plus unmatched
+  derived ID `field1_cube2`.
+- Confirmed 18 cubes have complete reflectance, CSV labels, combined masks, and
+  individual chickpea/weed/soil masks.
+- Confirmed Cube 24 and Cube 28 label CSVs are exact fingerprint duplicates.
+- Identified mask-version ambiguity: Cube 31 has two chickpea and two weed masks;
+  Cube 36 has five soil masks. A single authoritative mask per class must be
+  selected using registration and provenance checks.
+- Added metadata-only QC for ENVI headers, cube byte sizes, wavelength coverage,
+  TIFF masks, CSV schemas, and cross-cube duplicate detection.
+
+### Next gate
+
+- Run `scripts/run_data_qc.py` and review all generated QC reports before writing
+  the full-band loader or training any model.
+
 ## 2026-07-30
 
 ### Completed
