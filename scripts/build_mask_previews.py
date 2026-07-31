@@ -19,9 +19,11 @@ COLORS = {
 }
 
 
-def root_for(config: dict, source: str, date: str) -> Path:
+def root_for(config: dict, source: str, processing_batch: str) -> Path:
     if source == "field1.reflectance":
-        return Path(config["field1"]["reflectance_dates"][str(date)])
+        field1 = config["field1"]
+        batches = field1.get("reflectance_processing_batches", field1.get("reflectance_dates", {}))
+        return Path(batches[str(processing_batch)])
     return Path(config["field1"]["masks_emmanuel"])
 
 
@@ -97,7 +99,7 @@ def main() -> None:
             (catalog["cube_id_inferred"] == cube)
             & (catalog["file_role"] == "reflectance_header")
         ].iloc[0]
-        header = root_for(config, reflectance["source"], reflectance["acquisition_date"]) / reflectance["relative_path"]
+        header = root_for(config, reflectance["source"], reflectance.get("processing_batch", reflectance["acquisition_date"])) / reflectance["relative_path"]
         rgb, _ = load_rgb(header)
         cube_masks = catalog[
             (catalog["cube_id_inferred"] == cube)
@@ -107,7 +109,7 @@ def main() -> None:
         valid: list[tuple[str, np.ndarray]] = []
         skipped: list[str] = []
         for _, row in cube_masks.iterrows():
-            mask_path = root_for(config, row["source"], row["acquisition_date"]) / row["relative_path"]
+            mask_path = root_for(config, row["source"], row.get("processing_batch", row["acquisition_date"])) / row["relative_path"]
             mask = load_mask(mask_path, rgb.shape[0], rgb.shape[1])
             if mask is None:
                 skipped.append(row["relative_path"])
