@@ -84,6 +84,18 @@ smoothing protocol.
 - No smoothing before primary spatial-coherence evaluation.
 - Report both object/pixel counts and spatially clustered uncertainty.
 
+## Geometric chickpea prior
+
+- Confirmed Field 1 plot polygons define where planted chickpea may occur.
+- The 1.5 m field-boundary tolerance is used only for field-identity QC and is
+  never used as the chickpea constraint buffer.
+- Apply plot constraints as a documented post-model refinement, preserving raw
+  predictions for comparison.
+- Test outward plot buffers of 0, 0.15, 0.30, 0.50, and 1.0 m using Field 1
+  spatial validation only. No buffer is selected using Field 2.
+- Outside the allowed plot region, suppress chickpea; assign weed only through
+  the vegetation decision, otherwise retain soil/unlabelled status.
+
 ## Primary evidence
 
 - Cluster stability across seeds and held-out Field 1 blocks.
