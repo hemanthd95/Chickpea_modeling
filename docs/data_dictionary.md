@@ -12,3 +12,7 @@
 The local preflight creates machine-readable file inventories under
 `metadata/local/`. Each row records source key, acquisition date, relative path,
 extension, size, and inferred cube identifier.
+
+Label codes are defined in `configs/data_decisions.yaml`: 1 = soil, 2 = chickpea,
+and 3 = weed. Excluded duplicate table associations and mask variants are also
+recorded there with reasons.
