@@ -63,6 +63,23 @@ corrections.
 - Revised the deep audit to compare label-class totals against observed binary
   mask pixel counts and to compute full SHA-256 hashes for all label CSVs.
 
+### Provenance resolution
+
+- Full SHA-256 confirmed three byte-identical CSV pairs: Cube 24/28, Cube 30/32,
+  and Cube 35/56.
+- Mask-count agreement assigns the valid copies to Cubes 24, 32, and 35,
+  respectively. CSV associations for Cubes 28, 30, and 56 are excluded until
+  regenerated from their own data.
+- Confirmed label mapping: 1 = soil, 2 = chickpea, and 3 = weed. Chickpea and weed
+  mask counts agree exactly for most non-duplicated tables; soil masks include
+  additional valid/background-adjacent pixels and therefore differ modestly.
+- Cube 31 generated and GPS weed masks are not identical (IoU 0.811867). The
+  generated mask exactly reproduces the CSV count and is the default for baseline
+  reproducibility; the GPS mask is retained as a sensitivity analysis.
+- Encoded decisions in `configs/data_decisions.yaml`; no source file was changed.
+- Added RGB/mask preview generation for visual QA before authoritative-manifest
+  creation.
+
 ## 2026-07-30
 
 ### Completed
