@@ -1,9 +1,11 @@
 project_root: /home/hemanthd95/Chickpea_modeling
 field1:
+  acquisition_date: "2025-05-06"
   derived_ssl: /home/hemanthd95/Chickpea_modeling/data/Kusi_interns/Masks for modelling/Training_data_for_ss_model
   label_csvs: /home/hemanthd95/Chickpea_modeling/data/Kusi_interns/Training_Testing_Data
   masks_emmanuel: /home/hemanthd95/Chickpea_modeling/data/Kusi_interns/Masks for modelling/Emmanuel_completed
-  reflectance_dates:
+  # Folder names record student processing dates, not image acquisition dates.
+  reflectance_processing_batches:
     "2025-06-06": /home/hemanthd95/Chickpea_modeling/data/Kusi_interns/6_6_2025
     "2025-06-15": /home/hemanthd95/Chickpea_modeling/data/Kusi_interns/6_15_2025
     "2025-06-23": /home/hemanthd95/Chickpea_modeling/data/Kusi_interns/6_23_2025
