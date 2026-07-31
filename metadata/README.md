@@ -13,6 +13,9 @@ Current report stages:
   authoritative class counts, accompanied by a PNG visual-QC overview.
 - `normalization/`: fold-specific training-only spectral statistics and PNG
   diagnostics. The hashed normalization contract remains under `contracts/`.
+- `sampling/`: leakage-aware observed training-centre summaries and visual QC.
+  The indexed centre pool is a training contract, never a replacement for
+  exhaustive held-out evaluation.
 
 Accepted local analytical contracts are written to `metadata/local/contracts/`.
 Each contract includes hashes and the visual artifact reviewed by the investigator.
