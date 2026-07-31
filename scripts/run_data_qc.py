@@ -15,10 +15,11 @@ ENVI_BYTES = {1: 1, 2: 2, 3: 4, 4: 4, 5: 8, 6: 8, 9: 16,
               12: 2, 13: 4, 14: 8, 15: 8}
 
 
-def source_root(config: dict, source: str, date: str) -> Path:
+def source_root(config: dict, source: str, processing_batch: str) -> Path:
     field1 = config["field1"]
     if source == "field1.reflectance":
-        return Path(field1["reflectance_dates"][str(date)])
+        batches = field1.get("reflectance_processing_batches", field1.get("reflectance_dates", {}))
+        return Path(batches[str(processing_batch)])
     mapping = {
         "field1.derived_ssl": field1["derived_ssl"],
         "field1.label_csvs": field1["label_csvs"],
@@ -34,7 +35,7 @@ def scalar(metadata: dict, key: str, default: int = 0) -> int:
 def inspect_envi(row: pd.Series, config: dict) -> dict[str, object]:
     from spectral.io import envi
 
-    header = source_root(config, row["source"], row["acquisition_date"]) / row["relative_path"]
+    header = source_root(config, row["source"], row.get("processing_batch", row["acquisition_date"])) / row["relative_path"]
     metadata = envi.read_envi_header(str(header))
     lines, samples, bands = (scalar(metadata, key) for key in ("lines", "samples", "bands"))
     dtype_code = scalar(metadata, "data type")
@@ -47,6 +48,7 @@ def inspect_envi(row: pd.Series, config: dict) -> dict[str, object]:
     return {
         "cube_id": row["cube_id_inferred"],
         "acquisition_date": row["acquisition_date"],
+        "processing_batch": row.get("processing_batch", ""),
         "file_role": row["file_role"],
         "header": row["relative_path"],
         "lines": lines,
@@ -71,7 +73,7 @@ def inspect_envi(row: pd.Series, config: dict) -> dict[str, object]:
 def inspect_mask(row: pd.Series, config: dict) -> dict[str, object]:
     import rasterio
 
-    path = source_root(config, row["source"], row["acquisition_date"]) / row["relative_path"]
+    path = source_root(config, row["source"], row.get("processing_batch", row["acquisition_date"])) / row["relative_path"]
     with rasterio.open(path) as dataset:
         scale = max(dataset.height / 512, dataset.width / 512, 1)
         out_height = max(1, round(dataset.height / scale))
@@ -97,7 +99,7 @@ def inspect_mask(row: pd.Series, config: dict) -> dict[str, object]:
 
 
 def inspect_label(row: pd.Series, config: dict) -> dict[str, object]:
-    path = source_root(config, row["source"], row["acquisition_date"]) / row["relative_path"]
+    path = source_root(config, row["source"], row.get("processing_batch", row["acquisition_date"])) / row["relative_path"]
     sample = pd.read_csv(path, nrows=1000)
     candidate_columns = [
         column for column in sample.columns
