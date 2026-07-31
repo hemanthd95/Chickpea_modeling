@@ -32,7 +32,11 @@ def main() -> None:
         batches = config["field1"].get(
             "reflectance_processing_batches", config["field1"].get("reflectance_dates", {})
         )
-        root = Path(batches[row["processing_batch"]])
+        root = (
+            project / "data" / "OneDrive_2026-07-31_raw"
+            if row.get("reflectance_source", "processing_batch") == "archive_cube20"
+            else Path(batches[row["processing_batch"]])
+        )
         header = root / row["reflectance_header"]
         data = root / row["reflectance_bip"]
         image = envi.open(str(header), str(data))
