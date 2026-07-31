@@ -160,6 +160,16 @@ corrections.
   coordinate/quality fields but no treatment, cultivar, or planting-date mapping.
 - Added a focused audit for the newly observed Field 1 Cube 20 reflectance and
   competing mask variants before considering it for the authoritative manifest.
+- Cube 20 reflectance is a valid 150-band uint16 EPSG:32617 cube (989×1517 at
+  1.5 cm). One binary chickpea mask already matches this exact grid.
+- Twelve initial dimension warnings were reinterpreted: most masks use a valid
+  alternate 1092×1591 georeferenced grid and require nearest-neighbor reprojection;
+  multiband/continuous RGB and desktop products are visualization-only.
+- The non-desktop combined Cube 20 mask is categorical (0/1/2/3). Added aligned
+  agreement tests against each binary variant before selecting or deriving masks.
+- Corrected plot interpretation: current-cube coverage is not field identity.
+  Named Field 1 boundary support and cube coverage are now reported separately;
+  exact polygon containment remains required before geometric label refinement.
 
 ### Spectral profile and supporting archive
 
