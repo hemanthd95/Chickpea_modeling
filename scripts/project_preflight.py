@@ -57,10 +57,10 @@ def infer_file_role(path: Path, source: str) -> str:
 
 
 def lightweight_fingerprint(path: Path) -> str:
-    """Hash metadata and small edge samples, not entire multi-GB cubes."""
+    """Hash file size and edge samples, not the full multi-GB file."""
     digest = hashlib.sha256()
     stat = path.stat()
-    digest.update(f"{stat.st_size}:{stat.st_mtime_ns}".encode())
+    digest.update(str(stat.st_size).encode())
     with path.open("rb") as stream:
         digest.update(stream.read(65_536))
         if stat.st_size > 65_536:
