@@ -137,6 +137,14 @@ corrections.
 - Removed the optional Fiona dependency after the workstation check. The audit
   now reads SHP, DBF, and PRJ metadata directly and leaves the conda environment
   unchanged.
+- The dependency-free audit inspected 75 Field 1 shapefiles and 41 Field 1 CSVs
+  with no structural issues; 39 locked and 26 unassigned records stayed unopened.
+- All 75 layers use WGS 84 / UTM Zone 17N. The combined layer contains 35
+  polygons matching the observed plot IDs 10–26, 37–45, and 64–72.
+- Plot GIS attributes contain geometry bookkeeping and area only; RTK CSVs contain
+  coordinate/quality fields but no treatment, cultivar, or planting-date mapping.
+- Added a focused audit for the newly observed Field 1 Cube 20 reflectance and
+  competing mask variants before considering it for the authoritative manifest.
 
 ### Spectral profile and supporting archive
 
