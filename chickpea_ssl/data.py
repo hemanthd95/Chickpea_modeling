@@ -17,6 +17,7 @@ from torch.utils.data import Dataset
 class CubeRecord:
     cube_id: str
     acquisition_date: str
+    processing_batch: str
     header: Path
     data: Path
     chickpea_mask: Path | None
@@ -30,11 +31,15 @@ def load_records(paths_file: Path, manifest_file: Path) -> list[CubeRecord]:
     mask_root = Path(config["field1"]["masks_emmanuel"])
     records: list[CubeRecord] = []
     for _, row in manifest.iterrows():
-        date_root = Path(config["field1"]["reflectance_dates"][row["acquisition_date"]])
+        batches = config["field1"].get(
+            "reflectance_processing_batches", config["field1"].get("reflectance_dates", {})
+        )
+        date_root = Path(batches[row["processing_batch"]])
         def optional_mask(role: str) -> Path | None:
             return mask_root / row[role] if row[role] else None
         records.append(CubeRecord(
             cube_id=row["cube_id"], acquisition_date=row["acquisition_date"],
+            processing_batch=row["processing_batch"],
             header=date_root / row["reflectance_header"],
             data=date_root / row["reflectance_bip"],
             chickpea_mask=optional_mask("chickpea_mask"),
