@@ -45,6 +45,19 @@ class SimCLR(nn.Module):
         return embedding, projection
 
 
+class SupervisedClassifier(nn.Module):
+    """Diagnostic three-class head on the shared spectral-spatial encoder."""
+
+    def __init__(self, in_channels: int = 111, embedding_dim: int = 128,
+                 classes: int = 3):
+        super().__init__()
+        self.encoder = SmallSpectralSpatialEncoder(in_channels, embedding_dim)
+        self.classifier = nn.Linear(embedding_dim, classes)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.classifier(self.encoder(x))
+
+
 def nt_xent(z1: torch.Tensor, z2: torch.Tensor, temperature: float = 0.2) -> torch.Tensor:
     n = z1.shape[0]
     z = torch.cat((z1, z2), dim=0)
@@ -53,4 +66,3 @@ def nt_xent(z1: torch.Tensor, z2: torch.Tensor, temperature: float = 0.2) -> tor
     targets = torch.arange(n, device=z.device)
     targets = torch.cat((targets + n, targets))
     return nn.functional.cross_entropy(similarity, targets)
-
