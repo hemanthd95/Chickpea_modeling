@@ -19,26 +19,35 @@ import rasterio
 import yaml
 
 from chickpea_ssl.data import load_records
-from chickpea_ssl.spatial import spatial_group_id
+from chickpea_ssl.spatial import map_block_indices, spatial_group_id
 
 
 def blocks_inside_dataset(dataset: rasterio.io.DatasetReader, block_size: float,
                           origin_x: float, origin_y: float) -> list[tuple[int, int]]:
-    bounds = dataset.bounds
-    first_x = int(np.floor((bounds.left - origin_x) / block_size))
-    last_x = int(np.floor((bounds.right - origin_x) / block_size))
-    first_y = int(np.floor((bounds.bottom - origin_y) / block_size))
-    last_y = int(np.floor((bounds.top - origin_y) / block_size))
-    inverse = ~dataset.transform
-    selected: list[tuple[int, int]] = []
-    for block_x in range(first_x, last_x + 1):
-        x = origin_x + (block_x + 0.5) * block_size
-        for block_y in range(first_y, last_y + 1):
-            y = origin_y + (block_y + 0.5) * block_size
-            column, row = inverse * (x, y)
-            if 0 <= row < dataset.height and 0 <= column < dataset.width:
-                selected.append((block_x, block_y))
-    return selected
+    """Return every global block touched by a raster pixel centre.
+
+    Testing only whether a block centre falls inside a rotated cube misses valid
+    edge pixels. Coordinate generation is chunked and does not read reflectance.
+    """
+    transform = dataset.transform
+    columns = np.arange(dataset.width, dtype=np.float64)[None, :] + 0.5
+    selected: set[tuple[int, int]] = set()
+    for row_start in range(0, dataset.height, 512):
+        rows = np.arange(
+            row_start, min(row_start + 512, dataset.height), dtype=np.float64
+        )[:, None] + 0.5
+        x = transform.a * columns + transform.b * rows + transform.c
+        y = transform.d * columns + transform.e * rows + transform.f
+        shape = (len(rows), dataset.width)
+        x = np.broadcast_to(x, shape)
+        y = np.broadcast_to(y, shape)
+        block_x, block_y = map_block_indices(
+            x, y, block_size, origin_x, origin_y
+        )
+        selected.update(map(tuple, np.unique(
+            np.column_stack((block_x.ravel(), block_y.ravel())), axis=0
+        )))
+    return sorted(selected)
 
 
 def main() -> None:
