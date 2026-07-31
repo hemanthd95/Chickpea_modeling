@@ -92,6 +92,18 @@ corrections.
 - Added authoritative-manifest construction and full-resolution quantitative
   checks for class-mask overlaps, missing masks, and unclassified pixels.
 
+### Authoritative-manifest findings
+
+- Built a 31-cube manifest: 18 weed-SSL-ready cubes, 15 three-class
+  raster-supervised-ready cubes, and 15 valid legacy label tables.
+- Fifteen three-mask cubes contain class overlaps; none contains triple overlap.
+- Across labeled-mask unions, 547,817 of 13,734,935 pixels overlap (3.99%).
+  Per-cube overlap ranges from 1.73% to 10.40% among three-mask cubes.
+- The soil-mask pixel excess closely tracks overlap on trusted CSV associations,
+  suggesting the historical label-table construction gave vegetation priority
+  over soil. Pair-specific overlap measurement was added before freezing this
+  precedence rule.
+
 ## 2026-07-30
 
 ### Completed
