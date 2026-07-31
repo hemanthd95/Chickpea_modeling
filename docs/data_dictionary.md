@@ -16,3 +16,7 @@ extension, size, and inferred cube identifier.
 Label codes are defined in `configs/data_decisions.yaml`: 1 = soil, 2 = chickpea,
 and 3 = weed. Excluded duplicate table associations and mask variants are also
 recorded there with reasons.
+
+The primary hyperspectral band policy is stored in `configs/spectral_bands.yaml`.
+Supporting files extracted from the OneDrive archive are stored separately under
+`data/OneDrive_2026-07-31_raw/`; their local inventory is not committed.
