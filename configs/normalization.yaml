@@ -1,0 +1,8 @@
+mode: fold_training_cube_balanced_valid_pixels
+samples_per_cube: 20000
+seed: 42
+band_section: primary
+boundary_exclusion_m: 0.30
+standard_deviation: population
+epsilon: 1.0e-6
+
