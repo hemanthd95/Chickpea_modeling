@@ -112,6 +112,11 @@ def main() -> None:
         manifest_rows.append(row)
 
         counts = {role: int(array.sum()) for role, array in selected_arrays.items()}
+        chickpea = selected_arrays.get("chickpea_mask")
+        weed = selected_arrays.get("weed_mask")
+        soil = selected_arrays.get("soil_mask")
+        def pair_overlap(first: np.ndarray | None, second: np.ndarray | None) -> int:
+            return int(np.logical_and(first, second).sum()) if first is not None and second is not None else 0
         conflict = np.zeros((height, width), dtype=np.uint8)
         for array in selected_arrays.values():
             conflict += array.astype(np.uint8)
@@ -126,6 +131,9 @@ def main() -> None:
             "unclassified_pixels": int((~union).sum()),
             "overlap_pixels": int((conflict > 1).sum()),
             "triple_overlap_pixels": int((conflict > 2).sum()),
+            "chickpea_weed_overlap": pair_overlap(chickpea, weed),
+            "chickpea_soil_overlap": pair_overlap(chickpea, soil),
+            "weed_soil_overlap": pair_overlap(weed, soil),
             "overlap_fraction_of_union": float((conflict > 1).sum() / max(union.sum(), 1)),
         })
 
@@ -144,4 +152,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
