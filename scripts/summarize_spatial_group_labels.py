@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import rasterio
 import yaml
+import matplotlib.pyplot as plt
 
 from chickpea_ssl.data import authoritative_class_map, load_records
 from chickpea_ssl.spatial import map_block_indices, spatial_group_id
@@ -109,6 +110,41 @@ def main() -> None:
     by_cube.to_csv(reports / "spatial_group_class_counts_by_cube.csv", index=False)
     summary.to_csv(reports / "spatial_group_class_summary.csv", index=False)
 
+    plot_frame = summary.copy()
+    denominator = plot_frame["labeled_pixel_observations"].replace(0, np.nan)
+    panels = [
+        ("cubes_with_labels", "Labeled cube observations", "viridis", 1, None),
+        ("soil_fraction", "Soil fraction", "copper", 0, 1),
+        ("chickpea_fraction", "Chickpea fraction", "Greens", 0, 1),
+        ("weed_fraction", "Weed fraction", "Purples", 0, 1),
+    ]
+    for role in ("soil", "chickpea", "weed"):
+        plot_frame[f"{role}_fraction"] = (
+            plot_frame[f"{role}_pixel_observations"] / denominator
+        )
+    figure, axes = plt.subplots(2, 2, figsize=(12, 10), constrained_layout=True)
+    for axis, (column, title, colour_map, lower, upper) in zip(axes.flat, panels):
+        pivot = plot_frame.pivot(index="block_y", columns="block_x", values=column)
+        image = axis.imshow(
+            pivot.to_numpy(), origin="lower", interpolation="nearest",
+            cmap=colour_map, vmin=lower, vmax=upper, aspect="equal",
+            extent=[pivot.columns.min() * block_size,
+                    (pivot.columns.max() + 1) * block_size,
+                    pivot.index.min() * block_size,
+                    (pivot.index.max() + 1) * block_size],
+        )
+        axis.set_title(title)
+        axis.set_xlabel("UTM easting (m)")
+        axis.set_ylabel("UTM northing (m)")
+        figure.colorbar(image, ax=axis, shrink=0.82)
+    figure.suptitle(
+        "Field 1 authoritative labels by 5 m spatial group\n"
+        "Fractions use observed labels with weed > chickpea > soil precedence",
+        fontsize=14,
+    )
+    figure.savefig(reports / "spatial_group_class_overview.png", dpi=200)
+    plt.close(figure)
+
     totals = summary[[
         "soil_pixel_observations", "chickpea_pixel_observations",
         "weed_pixel_observations"
@@ -119,9 +155,9 @@ def main() -> None:
     print(f"Chickpea pixel observations: {int(totals.iloc[1]):,}")
     print(f"Weed pixel observations: {int(totals.iloc[2]):,}")
     print(f"Reports written to: {reports}")
+    print(f"Visual QC: {reports / 'spatial_group_class_overview.png'}")
     print("Counts include repeated observations in overlapping cubes; no fold was assigned.")
 
 
 if __name__ == "__main__":
     main()
-
