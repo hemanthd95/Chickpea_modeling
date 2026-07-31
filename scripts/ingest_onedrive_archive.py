@@ -25,7 +25,10 @@ def sha256(path: Path) -> str:
 
 def classify(path: PurePosixPath) -> str:
     name = str(path).lower()
-    if re.search(r"field[ _-]*2|tall[ _-]*grass", name):
+    if (
+        re.search(r"field[ _-]*2|tall[ _-]*grass", name)
+        or re.search(r"kusi cubes analysis trials/cube[_ -]*34_georectify", name)
+    ):
         return "locked_field2_external_validation"
     if re.search(r"plot|treatment|experiment|design|boundary", name):
         return "experimental_plot_support"
@@ -110,4 +113,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
