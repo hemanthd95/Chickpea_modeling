@@ -137,7 +137,10 @@ def main() -> None:
         })
 
     pd.DataFrame(rows).to_csv(local / "archive_cube20_raster_qc.csv", index=False)
-    pd.DataFrame(comparisons).to_csv(local / "archive_cube20_mask_comparison.csv", index=False)
+    pd.DataFrame(comparisons, columns=[
+        "role", "first", "second", "intersection_pixels", "union_pixels",
+        "iou", "arrays_identical",
+    ]).to_csv(local / "archive_cube20_mask_comparison.csv", index=False)
     pd.DataFrame(issues, columns=["relative_path", "issue"]).to_csv(
         local / "archive_cube20_issues.csv", index=False
     )
