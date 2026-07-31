@@ -117,6 +117,20 @@ corrections.
 - Added deterministic profiling of up to 10,000 observed spectra per cube so
   bad-band decisions are derived from the 31 real cubes.
 
+### Supporting archive inventory
+
+- Safely extracted 520 supporting files into an isolated, ignored raw-data
+  directory and recorded per-file SHA-256 hashes.
+- Kept 36 Field 2/tall-grass records locked; their contents and coordinates were
+  not interpreted.
+- Confirmed all 81 observed shapefile datasets contain the required SHP, SHX,
+  DBF, and PRJ components.
+- Found 35 numbered plot groups: 10–26, 37–45, and 64–72. These are treated as
+  an observed subset, not assumed missing plots, until the experimental design
+  and combined-plot layer are inspected.
+- Added a metadata-only supporting GIS audit. It inspects unlocked Field 1
+  geometry, CRS, feature counts, and schemas while never opening locked records.
+
 ### Spectral profile and supporting archive
 
 - Profiled 310,000 observed spectra from all 31 Field 1 cubes with zero sampled
