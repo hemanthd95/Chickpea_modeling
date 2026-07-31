@@ -16,6 +16,8 @@ Current report stages:
 - `sampling/`: leakage-aware observed training-centre summaries and visual QC.
   The indexed centre pool is a training contract, never a replacement for
   exhaustive held-out evaluation.
+- `patch_qc/`: center-label, patch-shape, normalization checks, and an observed
+  NIR–red–green patch montage for investigator review before model training.
 
 Accepted local analytical contracts are written to `metadata/local/contracts/`.
 Each contract includes hashes and the visual artifact reviewed by the investigator.
