@@ -23,8 +23,9 @@ augmentation of observed patches is permitted and must be documented.
 
 ### Field 1: development
 
-- Four acquisition directories: 2025-06-06, 2025-06-15, 2025-06-23, and
-  2025-06-30.
+- Single confirmed acquisition date: 2025-05-06.
+- Four directories dated 2025-06-06, 2025-06-15, 2025-06-23, and 2025-06-30
+  are student processing batches, not separate acquisitions.
 - Original approximately 150-band Resonon Pika-L reflectance cubes.
 - Manual chickpea, weed, and soil information from mask products and CSV tables.
 - Used for preprocessing decisions, model fitting, ablation studies, spatially
@@ -45,8 +46,8 @@ augmentation of observed patches is permitted and must be documented.
    and mask registration.
 2. Remove invalid/bad bands using documented sensor/data criteria.
 3. Fit normalization parameters using training blocks only.
-4. Sample observed vegetation-centred patches while tracking cube, date, and
-   spatial block.
+4. Sample observed vegetation-centred patches while tracking cube, processing
+   batch, plot assignment, and spatial block.
 5. Train a contrastive spectral-spatial encoder on Field 1.
 6. Cluster only centre pixels belonging to the Field 1 weed mask.
 7. Choose clustering complexity using stability, not a forced five-cluster answer.
@@ -83,7 +84,7 @@ smoothing protocol.
 ## Primary evidence
 
 - Cluster stability across seeds and held-out Field 1 blocks.
-- Cross-date transfer within Field 1.
+- Transfer across held-out cubes, plots, and spatial blocks within Field 1.
 - Spectral and spatial separability with uncertainty.
 - Field 2 RTK tall-grass cluster enrichment.
 - Sensitivity to patch size, band set, cluster method, and cluster count.
