@@ -15,7 +15,8 @@ Current report stages:
   diagnostics. The hashed normalization contract remains under `contracts/`.
 - `sampling/`: leakage-aware observed training-centre summaries and visual QC.
   The indexed centre pool is a training contract, never a replacement for
-  exhaustive held-out evaluation.
+  exhaustive held-out evaluation. Candidate patches containing internal
+  georectification NoData are excluded and reported by cube.
 - `patch_qc/`: center-label, patch-shape, normalization checks, and an observed
   NIR–red–green patch montage for investigator review before model training.
 
