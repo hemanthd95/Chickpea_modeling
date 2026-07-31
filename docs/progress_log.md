@@ -134,6 +134,9 @@ corrections.
 - Added a metadata-only supporting GIS audit. It inspects unlocked Field 1
   geometry, CRS, feature counts, and schemas while never opening locked or
   unassigned records (including Project 50/51 until their role is confirmed).
+- Removed the optional Fiona dependency after the workstation check. The audit
+  now reads SHP, DBF, and PRJ metadata directly and leaves the conda environment
+  unchanged.
 
 ### Spectral profile and supporting archive
 
