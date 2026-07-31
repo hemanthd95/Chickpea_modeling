@@ -19,6 +19,21 @@ def plot_id(path: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
+def access_role(relative_path: str, category: str) -> str:
+    name = relative_path.lower()
+    if (
+        category == LOCKED
+        or re.search(r"field[ _-]*2|tall[ _-]*grass", name)
+        or re.search(r"kusi cubes analysis trials/cube[_ -]*34_georectify", name)
+    ):
+        return "locked_external_validation"
+    if category == "experimental_plot_support" or re.search(
+        r"field[ _-]*1", name
+    ):
+        return "field1_development_candidate"
+    return "unassigned_support"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--paths", required=True, type=Path)
@@ -51,10 +66,14 @@ def main() -> None:
     csv_rows: list[dict[str, object]] = []
     issues: list[dict[str, str]] = []
 
-    # Locked records are counted but never opened, so their coordinates and
-    # attribute values cannot influence Field 1 development decisions.
-    unlocked = inventory[inventory["category"] != LOCKED].copy()
-    for _, row in unlocked[unlocked["extension"] == ".shp"].iterrows():
+    inventory["access_role"] = inventory.apply(
+        lambda row: access_role(str(row["relative_path"]), str(row["category"])),
+        axis=1,
+    )
+    # Only explicit Field 1 candidates are opened. Locked and unassigned records
+    # cannot influence development decisions.
+    field1 = inventory[inventory["access_role"] == "field1_development_candidate"]
+    for _, row in field1[field1["extension"] == ".shp"].iterrows():
         relative = str(row["relative_path"])
         path = source / relative
         try:
@@ -80,9 +99,7 @@ def main() -> None:
                     "bounds_bottom": bounds[1],
                     "bounds_right": bounds[2],
                     "bounds_top": bounds[3],
-                    "content_role": "field1_development_candidate"
-                    if row["category"] == "experimental_plot_support"
-                    else "unassigned_support",
+                    "content_role": row["access_role"],
                 })
                 if not crs:
                     issues.append({"relative_path": relative, "issue": "missing_crs"})
@@ -91,7 +108,7 @@ def main() -> None:
         except Exception as error:  # report corrupt/unreadable GIS without stopping batch
             issues.append({"relative_path": relative, "issue": f"read_error: {error}"})
 
-    for _, row in unlocked[unlocked["extension"] == ".csv"].iterrows():
+    for _, row in field1[field1["extension"] == ".csv"].iterrows():
         relative = str(row["relative_path"])
         path = source / relative
         try:
@@ -103,9 +120,7 @@ def main() -> None:
                 "rows": len(table),
                 "columns": len(table.columns),
                 "column_names": "|".join(map(str, table.columns)),
-                "content_role": "field1_development_candidate"
-                if row["category"] == "experimental_plot_support"
-                else "unassigned_support",
+                "content_role": row["access_role"],
             })
         except Exception as error:
             issues.append({"relative_path": relative, "issue": f"csv_read_error: {error}"})
@@ -118,13 +133,15 @@ def main() -> None:
     issue_table.to_csv(local / "supporting_gis_issues.csv", index=False)
 
     observed_plots = sorted({int(value) for value in vector["plot_id"].dropna()})
-    locked_count = int((inventory["category"] == LOCKED).sum())
-    print(f"Unlocked shapefiles inspected: {len(vector)}")
-    print(f"Unlocked CSV files inspected: {len(csv)}")
+    locked_count = int((inventory["access_role"] == "locked_external_validation").sum())
+    unassigned_count = int((inventory["access_role"] == "unassigned_support").sum())
+    print(f"Field 1 shapefiles inspected: {len(vector)}")
+    print(f"Field 1 CSV files inspected: {len(csv)}")
     print(f"Numbered plot IDs observed: {len(observed_plots)}")
     print(f"Plot IDs: {', '.join(map(str, observed_plots))}")
     print(f"GIS/CSV issues: {len(issue_table)}")
     print(f"Locked records skipped without opening: {locked_count}")
+    print(f"Unassigned records skipped without opening: {unassigned_count}")
     print(f"Reports written to: {local}")
 
 
