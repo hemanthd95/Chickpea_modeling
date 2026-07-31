@@ -119,6 +119,20 @@ corrections.
 
 ### Supporting archive inventory
 
+- Metadata correction from the investigator: all imagery was acquired on
+  2025-05-06. The four June folder dates record student processing, not repeated
+  acquisitions. Catalog and manifest schemas now separate `acquisition_date`
+  from `processing_batch`; no temporal-transfer claim will be made.
+- Flight geometry confirmed as 30 m AGL, 1 m/s, with 7 m swath spacing. Adjacent
+  cube overlap is expected and will be quantified rather than treated as a QC
+  defect.
+- Plot polygons may belong to Field 1, Field 2, or both. They are not authorized
+  as chickpea constraints until coordinate-based field assignment is complete.
+- Once assigned, plot interiors provide a chickpea-support prior and the spaces
+  between plot blocks provide alley exclusions. Outside-plot vegetation is not
+  automatically relabelled as weed until registration uncertainty and boundary
+  buffers are quantified.
+
 - Safely extracted 520 supporting files into an isolated, ignored raw-data
   directory and recorded per-file SHA-256 hashes.
 - Initially identified 36 Field 2/tall-grass records by explicit filenames.
