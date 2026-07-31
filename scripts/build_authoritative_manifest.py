@@ -79,6 +79,7 @@ def main() -> None:
         row: dict[str, object] = {
             "cube_id": cube,
             "acquisition_date": header_row["acquisition_date"],
+            "processing_batch": header_row.get("processing_batch", ""),
             "reflectance_header": header_row["relative_path"],
             "reflectance_bip": header_row["relative_path"][:-4],
             "height": height,
