@@ -249,6 +249,21 @@ corrections.
 - Investigator requested visual verification after each major task. Future stages
   will include meaningful PNG QC alongside numeric reports when applicable.
 
+### Class geography and candidate-fold optimizer
+
+- Authoritative precedence counts across 174 labeled spatial groups are 8,171,964
+  soil (56.18%), 1,238,391 chickpea (8.51%), and 5,136,987 weed (35.31%) pixel
+  observations. Counts intentionally retain repeat observations within a group.
+- Thirty-six labeled groups contain no chickpea. Simple easting quintiles assign
+  only 8.4% of chickpea to one fold; northing quintiles range from 12.1% to 29.4%,
+  so neither naive split is accepted.
+- Added a deterministic search over spatial-slab angles and boundaries. The
+  objective balances spatial groups, labeled groups, soil, weed, all labels, and
+  chickpea, with chickpea receiving the highest weight.
+- Candidate folds must meet minimum group and labeled-group counts. Disconnected
+  fold components receive a strong penalty. The output remains review-only until
+  its numeric summary and PNG are approved.
+
 ## 2026-07-30
 
 ### Completed
