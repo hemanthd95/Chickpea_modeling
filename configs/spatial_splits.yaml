@@ -1,0 +1,15 @@
+grouping:
+  # Map-coordinate groups prevent repeat observations in overlapping cubes from
+  # crossing folds. The zero origin makes IDs reproducible across workstations.
+  block_size_m: 5.0
+  origin_x_m: 0.0
+  origin_y_m: 0.0
+
+candidate_split:
+  status: review_spatial_group_index_before_freezing
+  folds: 5
+  seed: 42
+  # Reserved around fold boundaries during sampling. This exceeds the half-width
+  # of a 15-pixel patch at the observed 1.5 cm Cube 20 resolution.
+  boundary_exclusion_m: 0.30
+
