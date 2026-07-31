@@ -42,6 +42,7 @@ This writes `envi_qc.csv`, `mask_qc.csv`, `label_csv_qc.csv`, and
 python scripts/audit_labels_and_masks.py --paths configs/paths.local.yaml
 ```
 
-This streams only the observed `Label` column, verifies pixel counts, compares
-labels with binary masks, and writes `label_deep_audit.csv`,
-`label_mask_overlap.csv`, and `mask_variant_comparison.csv`.
+This streams only the observed `Label` column, compares class counts with binary
+mask pixels, computes full SHA-256 hashes, and writes `label_deep_audit.csv`,
+`label_mask_count_match.csv`, `mask_variant_comparison.csv`, and
+`label_sha256_duplicates.csv`.
