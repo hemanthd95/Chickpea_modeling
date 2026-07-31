@@ -125,7 +125,8 @@ corrections.
   from `processing_batch`; no temporal-transfer claim will be made.
 - Flight geometry confirmed as 30 m AGL, 1 m/s, with 7 m swath spacing. Adjacent
   cube overlap is expected and will be quantified rather than treated as a QC
-  defect.
+  defect. Map-coordinate spatial groups will keep repeat observations of the same
+  ground area in one fold to prevent cross-cube leakage.
 - Plot polygons may belong to Field 1, Field 2, or both. They are not authorized
   as chickpea constraints until coordinate-based field assignment is complete.
 - Once assigned, plot interiors provide a chickpea-support prior and the spaces
