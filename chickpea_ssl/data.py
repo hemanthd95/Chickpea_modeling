@@ -27,6 +27,7 @@ class CubeRecord:
 
 def load_records(paths_file: Path, manifest_file: Path) -> list[CubeRecord]:
     config = yaml.safe_load(paths_file.read_text())
+    project_root = Path(config["project_root"])
     manifest = pd.read_csv(manifest_file, dtype=str).fillna("")
     mask_root = Path(config["field1"]["masks_emmanuel"])
     records: list[CubeRecord] = []
@@ -34,9 +35,17 @@ def load_records(paths_file: Path, manifest_file: Path) -> list[CubeRecord]:
         batches = config["field1"].get(
             "reflectance_processing_batches", config["field1"].get("reflectance_dates", {})
         )
-        date_root = Path(batches[row["processing_batch"]])
+        date_root = (
+            project_root / "data" / "OneDrive_2026-07-31_raw"
+            if row.get("reflectance_source", "processing_batch") == "archive_cube20"
+            else Path(batches[row["processing_batch"]])
+        )
         def optional_mask(role: str) -> Path | None:
-            return mask_root / row[role] if row[role] else None
+            if not row[role]:
+                return None
+            if row.get("mask_source", "emmanuel") == "project_relative":
+                return project_root / row[role]
+            return mask_root / row[role]
         records.append(CubeRecord(
             cube_id=row["cube_id"], acquisition_date=row["acquisition_date"],
             processing_batch=row["processing_batch"],
