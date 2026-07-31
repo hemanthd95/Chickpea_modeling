@@ -26,6 +26,26 @@ corrections.
 - Run `scripts/run_data_qc.py` and review all generated QC reports before writing
   the full-band loader or training any model.
 
+### Metadata-QC findings
+
+- All 31 reflectance cubes are readable 150-band BIP arrays stored as uint16,
+  little-endian, with correct byte sizes and matching data files.
+- All reflectance headers report 150 wavelengths spanning 389.64–1030.82 nm and
+  include ENVI map information.
+- All 31 one-band source-mask BIPs match their reflectance cube dimensions and
+  byte sizes.
+- All 18 label CSVs share the same 17-column schema, but the Cube 24 and Cube 28
+  tables are exact duplicates despite different image dimensions (1575×1017 vs
+  1267×777); at least one association is invalid.
+- Four combined-mask files (Cubes 31, 36, 38, and 39) are small, ungeoreferenced,
+  four-band 8-bit images and are excluded from analytical mask selection.
+- Four chickpea masks (Cubes 31, 36, 38, and 39) contain 0–255 gradients rather
+  than binary values; Cube 31 also has a valid aligned binary alternative.
+- Every soil and weed TIFF inspected is binary. Fourteen combined masks are
+  single-band categorical rasters with values 0, 1, 2, and 3.
+- Added a deep audit to count the full Label columns and measure label-to-mask
+  overlap without assuming the meaning of codes 1, 2, and 3.
+
 ## 2026-07-30
 
 ### Completed
