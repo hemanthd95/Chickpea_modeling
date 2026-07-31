@@ -319,6 +319,18 @@ corrections.
   renders an observed NIR–red–green montage. False colours are diagnostic only
   and are not model inputs or biological labels.
 
+### Patch-QC correction: internal georectification NoData
+
+- Label, shape, and normalization checks passed for all 1,500 inspected patches,
+  but 202 patches (13.47%) contained at least one all-band-zero spatial pixel.
+  This is a patch-neighborhood issue despite valid authoritative centre labels.
+- Training on these patches could let the encoder learn georectification-footprint
+  geometry. The candidate-index builder now uses an integral image per cube and
+  requires every 15×15 patch pixel to contain observed reflectance.
+- Added per-cube exclusion reporting and made patch NoData a hard QC failure.
+- Corrected the montage sampler to show one observed example per class per fold
+  rather than selecting all examples from Fold 1.
+
 ## 2026-07-30
 
 ### Completed
