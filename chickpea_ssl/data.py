@@ -145,3 +145,38 @@ class SpectralPatchDataset(Dataset):
             patch = (patch - self.mean[None, None, :]) / np.maximum(self.std[None, None, :], 1e-6)
         patch = np.moveaxis(patch, -1, 0).copy()
         return torch.from_numpy(patch), torch.tensor(self.labels[index], dtype=torch.long)
+
+
+class IndexedPatchDataset(Dataset):
+    """Multi-cube patches from a frozen observed-centre table."""
+
+    def __init__(self, records: list[CubeRecord], centers: pd.DataFrame,
+                 band_indices: np.ndarray, mean: np.ndarray, std: np.ndarray):
+        self.records = {record.cube_id: record for record in records}
+        self.centers = centers.reset_index(drop=True).copy()
+        self.band_indices = np.asarray(band_indices, dtype=int)
+        self.mean = np.asarray(mean, dtype=np.float32)
+        self.std = np.asarray(std, dtype=np.float32)
+        self._cubes: dict[str, EnviCube] = {}
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state["_cubes"] = {}
+        return state
+
+    def __len__(self) -> int:
+        return len(self.centers)
+
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
+        row = self.centers.iloc[index]
+        cube_id = str(row["cube_id"])
+        if cube_id not in self._cubes:
+            self._cubes[cube_id] = EnviCube(self.records[cube_id], self.band_indices)
+        patch = self._cubes[cube_id].patch(
+            int(row["row"]), int(row["column"]), int(row["patch_size_pixels"])
+        )
+        patch = (patch - self.mean[None, None, :]) / np.maximum(
+            self.std[None, None, :], 1e-6
+        )
+        patch = np.moveaxis(patch, -1, 0).astype(np.float32, copy=False).copy()
+        return torch.from_numpy(patch), torch.tensor(int(row["class_id"]), dtype=torch.long)
