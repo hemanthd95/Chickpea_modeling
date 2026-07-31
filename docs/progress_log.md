@@ -306,6 +306,19 @@ corrections.
   use exhaustive tiled prediction on held-out authoritative masks so test
   prevalence is not altered by balanced sampling.
 
+### Training-centre pool passed and observed patch QC staged
+
+- Indexed 710,693 observed candidate centres from 19 cubes: 281,617 soil,
+  164,750 chickpea, and 264,326 weed. The resulting pool reduces the raw class
+  imbalance to approximately chickpea : weed : soil = 1 : 1.60 : 1.71.
+- Each fold retains 126,908–131,191 training-eligible chickpea centres and at
+  least 28,276 validation-diagnostic centres per class. Boundary removal remains
+  modest and no class or fold is starved.
+- Added a pretraining visual gate that loads real 15×15×111 patches, checks the
+  authoritative center label, patch shape, and fold-specific normalization, and
+  renders an observed NIR–red–green montage. False colours are diagnostic only
+  and are not model inputs or biological labels.
+
 ## 2026-07-30
 
 ### Completed
