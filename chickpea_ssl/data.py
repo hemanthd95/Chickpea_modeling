@@ -44,6 +44,13 @@ def load_records(paths_file: Path, manifest_file: Path) -> list[CubeRecord]:
     return records
 
 
+def load_band_indices(bands_file: Path, section: str = "primary") -> np.ndarray:
+    configuration = yaml.safe_load(bands_file.read_text())[section]
+    first = int(configuration["first_band_index"])
+    last = int(configuration["last_band_index_inclusive"])
+    return np.arange(first, last + 1, dtype=int)
+
+
 class EnviCube:
     def __init__(self, record: CubeRecord, band_indices: np.ndarray | None = None):
         self.record = record
