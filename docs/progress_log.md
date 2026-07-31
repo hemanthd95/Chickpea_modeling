@@ -277,6 +277,19 @@ corrections.
   hashes and preserves the reviewed PNG. The 0.30 m boundary exclusion remains a
   sampling-stage rule, not a relabeling operation.
 
+### Spatial contract frozen and normalization staged
+
+- Materialized the accepted 266-group, five-fold Field 1 contract. Assignment
+  SHA-256 is `53bef09e72fc112c8473c10bb16d54cd202bce055377ab91f776b2e8ad391b09`;
+  assignment and boundary hashes independently reverified from the attached files.
+- Added deterministic fold-specific normalization over a cube-balanced sample of
+  valid Field 1 pixels. Each held-out fold and training centres within 0.30 m of
+  its boundary are excluded from that fold's statistics.
+- Normalization uses only primary bands 3–113 and records population mean,
+  standard deviation, minimum, maximum, sample counts, configuration hashes, and
+  a PNG spectral diagnostic. Unlabeled Field 1 pixels remain eligible because the
+  SSL representation task is unsupervised. Field 2 remains locked.
+
 ## 2026-07-30
 
 ### Completed
