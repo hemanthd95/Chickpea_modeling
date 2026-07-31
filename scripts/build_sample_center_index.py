@@ -18,7 +18,7 @@ import pandas as pd
 import rasterio
 import yaml
 
-from chickpea_ssl.data import authoritative_class_map, load_records
+from chickpea_ssl.data import EnviCube, authoritative_class_map, load_records
 from chickpea_ssl.spatial import (
     map_block_indices, neighbour_boundary_safe_mask, spatial_group_id,
 )
@@ -78,17 +78,38 @@ def main() -> None:
     cap = int(sampling["max_centers_per_cube_group_class"])
     class_names = {int(key): value for key, value in sampling["class_names"].items()}
     frames: list[pd.DataFrame] = []
+    validity_rows: list[dict[str, object]] = []
 
     for record in load_records(args.paths, manifest):
         if not any((record.soil_mask, record.chickpea_mask, record.weed_mask)):
             continue
         labels = authoritative_class_map(record)
+        cube = EnviCube(record)
+        observed = np.any(cube.array > 0, axis=2)
         eligible = labels >= 0
         eligible[:radius] = False
         eligible[-radius:] = False
         eligible[:, :radius] = False
         eligible[:, -radius:] = False
         rows, columns = np.nonzero(eligible)
+        before_nodata_filter = len(rows)
+        invalid = (~observed).astype(np.int32)
+        integral = np.pad(invalid.cumsum(axis=0).cumsum(axis=1), ((1, 0), (1, 0)))
+        row_min, row_max = rows - radius, rows + radius + 1
+        column_min, column_max = columns - radius, columns + radius + 1
+        invalid_count = (
+            integral[row_max, column_max] - integral[row_min, column_max]
+            - integral[row_max, column_min] + integral[row_min, column_min]
+        )
+        fully_observed = invalid_count == 0
+        rows, columns = rows[fully_observed], columns[fully_observed]
+        validity_rows.append({
+            "cube_id": record.cube_id,
+            "patch_safe_labeled_centers_before_nodata_filter": before_nodata_filter,
+            "centers_excluded_for_patch_nodata": int((~fully_observed).sum()),
+            "fully_observed_patch_centers": len(rows),
+            "excluded_fraction": float((~fully_observed).sum() / max(before_nodata_filter, 1)),
+        })
         values = labels[rows, columns]
         with rasterio.open(record.data) as dataset:
             transform = dataset.transform
@@ -186,6 +207,7 @@ def main() -> None:
             })
     summary = pd.DataFrame(summary_rows)
     summary.to_csv(reports / "sample_center_summary.csv", index=False)
+    pd.DataFrame(validity_rows).to_csv(reports / "patch_nodata_exclusions_by_cube.csv", index=False)
 
     contract = {
         "status": "frozen_training_candidate_pool",
@@ -194,12 +216,14 @@ def main() -> None:
         "primary_evaluation": sampling["primary_evaluation"],
         "seed": int(sampling["seed"]), "patch_size_pixels": patch_size,
         "max_centers_per_cube_group_class": cap,
+        "require_fully_observed_patch": True,
         "center_index_sha256": sha256(index_path),
         "fold_assignment_sha256": sha256(folds_path),
         "configuration_sha256": sha256(args.sampling),
         "source_manifest_sha256": sha256(manifest),
         "notes": [
             "Every indexed centre is an observed labeled pixel; no samples were synthesized.",
+            "Every indexed patch contains no all-band-zero spatial pixel.",
             "Class/group caps create a training candidate pool and must not define primary test prevalence.",
             "Primary held-out evaluation uses exhaustive tiled inference on authoritative masks.",
         ],
