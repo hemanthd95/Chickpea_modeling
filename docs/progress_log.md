@@ -104,6 +104,19 @@ corrections.
   over soil. Pair-specific overlap measurement was added before freezing this
   precedence rule.
 
+### Mask precedence frozen
+
+- Pairwise overlap totals: chickpea–soil = 502,998 pixels, chickpea–weed =
+  44,819 pixels (Cube 24 only), and weed–soil = 0 pixels.
+- Cube 24's chickpea–weed overlap exactly equals the excess in its raw chickpea
+  mask relative to the trusted CSV, confirming the historical order.
+- Frozen dynamic precedence: weed > chickpea > soil > unlabeled. Source masks
+  remain unchanged.
+- Added the production ENVI/mask data layer, spatial-block identifiers, and an
+  observed-only patch dataset.
+- Added deterministic profiling of up to 10,000 observed spectra per cube so
+  bad-band decisions are derived from the 31 real cubes.
+
 ## 2026-07-30
 
 ### Completed
