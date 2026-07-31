@@ -6,7 +6,7 @@ grouping:
   origin_y_m: 0.0
 
 candidate_split:
-  status: optimize_then_review_before_freezing
+  status: accepted_pending_contract_materialization
   folds: 5
   seed: 42
   angle_step_degrees: 5
@@ -22,3 +22,11 @@ candidate_split:
   # Reserved around fold boundaries during sampling. This exceeds the half-width
   # of a 15-pixel patch at the observed 1.5 cm Cube 20 resolution.
   boundary_exclusion_m: 0.30
+  acceptance:
+    require_one_connected_component_per_fold: true
+    minimum_chickpea_share: 0.15
+    maximum_chickpea_share: 0.25
+    minimum_labeled_observation_share: 0.15
+    maximum_labeled_observation_share: 0.25
+    minimum_spatial_group_share: 0.10
+    maximum_spatial_group_share: 0.30
