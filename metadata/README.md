@@ -11,6 +11,8 @@ Current report stages:
 
 - `spatial_grouping/`: cube footprints, overlap, group membership, and group-level
   authoritative class counts, accompanied by a PNG visual-QC overview.
+- `normalization/`: fold-specific training-only spectral statistics and PNG
+  diagnostics. The hashed normalization contract remains under `contracts/`.
 
 Accepted local analytical contracts are written to `metadata/local/contracts/`.
 Each contract includes hashes and the visual artifact reviewed by the investigator.
