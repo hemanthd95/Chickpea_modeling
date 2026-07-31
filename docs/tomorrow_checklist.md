@@ -35,3 +35,13 @@ python scripts/run_data_qc.py --paths configs/paths.local.yaml
 
 This writes `envi_qc.csv`, `mask_qc.csv`, `label_csv_qc.csv`, and
 `qc_issues.csv` under `metadata/local/` without changing the source data.
+
+## Deep label/mask audit
+
+```bash
+python scripts/audit_labels_and_masks.py --paths configs/paths.local.yaml
+```
+
+This streams only the observed `Label` column, verifies pixel counts, compares
+labels with binary masks, and writes `label_deep_audit.csv`,
+`label_mask_overlap.csv`, and `mask_variant_comparison.csv`.
