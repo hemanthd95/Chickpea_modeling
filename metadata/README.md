@@ -19,6 +19,9 @@ Current report stages:
   georectification NoData are excluded and reported by cube.
 - `patch_qc/`: center-label, patch-shape, normalization checks, and an observed
   NIR–red–green patch montage for investigator review before model training.
+- `models/supervised_smoke_fold1/`: bounded diagnostic learning curves,
+  classification report, and confusion matrix. These are pipeline checks, not
+  primary five-fold results.
 
 Accepted local analytical contracts are written to `metadata/local/contracts/`.
 Each contract includes hashes and the visual artifact reviewed by the investigator.
