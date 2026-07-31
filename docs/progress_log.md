@@ -117,6 +117,20 @@ corrections.
 - Added deterministic profiling of up to 10,000 observed spectra per cube so
   bad-band decisions are derived from the 31 real cubes.
 
+### Spectral profile and supporting archive
+
+- Profiled 310,000 observed spectra from all 31 Field 1 cubes with zero sampled
+  NoData values.
+- Upper-edge saturation is severe: 0.86% at 869.34 nm, 1.54% at 873.77 nm,
+  greater than 50% by 913.77 nm, and effectively complete above 972 nm.
+- Frozen primary band set to indices 3–113 (111 bands, 401.84–869.34 nm), using
+  the nominal 400 nm lower bound and a global saturation threshold below 1%.
+- Retained sub-400 nm and extension through 882.63 nm only as declared
+  sensitivity analyses.
+- Added a safe, non-overwriting importer for `OneDrive_2026-07-31.zip`. It
+  extracts to a separate data folder, hashes all files, and locks Field 2/tall-
+  grass assets from content inspection during Field 1 development.
+
 ## 2026-07-30
 
 ### Completed
