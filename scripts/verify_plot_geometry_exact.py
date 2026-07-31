@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import math
 from pathlib import Path
+import sys
 
 import numpy as np
 import pandas as pd
@@ -13,6 +14,7 @@ from rasterio.features import rasterize
 from rasterio.transform import from_origin
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from chickpea_ssl.shapefile import read_polygon_geometries
 
 
