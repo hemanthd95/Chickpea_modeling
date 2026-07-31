@@ -46,6 +46,23 @@ corrections.
 - Added a deep audit to count the full Label columns and measure label-to-mask
   overlap without assuming the meaning of codes 1, 2, and 3.
 
+### Label-table audit correction and findings
+
+- The 18 CSVs are labeled-pixel feature tables, not full-raster tables; therefore
+  their row counts should not equal total cube pixels and cannot be reshaped into
+  spatial label maps.
+- Across the 18 table associations, 14,336,210 labeled rows were found: label 1
+  = 7,491,236 (52.25%), label 2 = 1,440,944 (10.05%), and label 3 = 5,404,030
+  (37.69%). The smallest class is consistent with chickpea scarcity, but mapping
+  is not accepted until mask counts verify it.
+- Similar row and class counts occur for Cube pairs 24/28, 30/32, and 35/56.
+- Correction: the catalog's earlier lightweight fingerprint included file
+  modification time. It was a fast change detector, not definitive proof of
+  byte-identical content. Full SHA-256 hashing is now required for label-table
+  duplicate conclusions.
+- Revised the deep audit to compare label-class totals against observed binary
+  mask pixel counts and to compute full SHA-256 hashes for all label CSVs.
+
 ## 2026-07-30
 
 ### Completed
