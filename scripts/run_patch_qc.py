@@ -94,6 +94,7 @@ def main() -> None:
     selected["normalized_abs_max"] = np.nan
     selected["raw_minimum"] = np.nan
     selected["raw_maximum"] = np.nan
+    selected["nodata_spatial_fraction"] = np.nan
     patch_cache: dict[str, np.ndarray] = {}
 
     for cube_id, cube_rows in selected.groupby("cube_id"):
@@ -120,6 +121,9 @@ def main() -> None:
             selected.loc[index, "normalized_abs_max"] = float(np.abs(normalized).max())
             selected.loc[index, "raw_minimum"] = float(patch.min())
             selected.loc[index, "raw_maximum"] = float(patch.max())
+            selected.loc[index, "nodata_spatial_fraction"] = float(
+                (~np.any(patch > 0, axis=2)).mean()
+            )
             patch_cache[row["sample_id"]] = patch
 
     summary = selected.groupby("class_name", as_index=False).agg(
@@ -129,6 +133,8 @@ def main() -> None:
         label_mismatches=("label_match", lambda values: int((~values).sum())),
         shape_failures=("shape_ok", lambda values: int((~values).sum())),
         nonfinite_normalized=("normalization_finite", lambda values: int((~values).sum())),
+        patches_with_nodata=("nodata_spatial_fraction", lambda values: int((values > 0).sum())),
+        maximum_nodata_spatial_fraction=("nodata_spatial_fraction", "max"),
         maximum_absolute_normalized_value=("normalized_abs_max", "max"),
         raw_minimum=("raw_minimum", "min"),
         raw_maximum=("raw_maximum", "max"),
@@ -138,16 +144,12 @@ def main() -> None:
 
     montage_rows = []
     for class_name in ("soil", "chickpea", "weed"):
-        candidates = selected[selected["class_name"] == class_name].sort_values(
-            ["fold", "cube_id", "sample_id"]
-        )
-        # Prefer different cubes before filling remaining montage positions.
-        diverse = candidates.drop_duplicates("cube_id")
-        if len(diverse) < int(qc["montage_per_class"]):
-            diverse = pd.concat([
-                diverse, candidates[~candidates["sample_id"].isin(diverse["sample_id"])]
-            ])
-        montage_rows.append(diverse.head(int(qc["montage_per_class"])))
+        for fold in sorted(selected["fold"].unique()):
+            candidates = selected[
+                (selected["class_name"] == class_name) & (selected["fold"] == fold)
+            ].sort_values(["cube_id", "sample_id"])
+            rng = stable_rng(int(sampling["seed"]), "montage", class_name, fold)
+            montage_rows.append(candidates.iloc[[int(rng.integers(len(candidates)))]])
     montage = pd.concat(montage_rows, ignore_index=True)
     target_wavelengths = np.asarray(qc["false_color_wavelengths_nm"], dtype=float)
     first_cube = EnviCube(records[montage.iloc[0]["cube_id"]], band_indices)
@@ -173,7 +175,9 @@ def main() -> None:
     preview = reports / "observed_patch_montage.png"
     figure.savefig(preview, dpi=200)
     plt.close(figure)
-    failures = int(summary[["label_mismatches", "shape_failures", "nonfinite_normalized"]].sum().sum())
+    failures = int(summary[[
+        "label_mismatches", "shape_failures", "nonfinite_normalized", "patches_with_nodata"
+    ]].sum().sum())
     print(summary.to_string(index=False))
     print(f"Details: {reports / 'patch_qc_details.csv'}")
     print(f"Visual QC: {preview}")
