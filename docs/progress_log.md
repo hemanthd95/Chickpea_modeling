@@ -331,6 +331,24 @@ corrections.
 - Corrected the montage sampler to show one observed example per class per fold
   rather than selecting all examples from Fold 1.
 
+
+### NoData-safe patch pool passed and supervised diagnostic staged
+
+- Rebuilt the observed candidate-centre contract after requiring every 15×15
+  neighborhood to contain measured reflectance. The corrected pool contains
+  684,521 centres: 270,118 soil, 159,976 chickpea, and 254,427 weed.
+- Repeated patch QC checked 500 examples per class across all five folds. All
+  1,500 patches passed centre-label, shape, finite-normalization, and full-patch
+  observation checks; no patch contains an all-band-zero spatial pixel.
+- Added a bounded Fold-1 supervised spectral-spatial diagnostic using 20,000
+  observed training patches and 5,000 observed validation patches per class.
+  It uses training-only Fold-1 normalization, mixed precision, and all visible
+  GPUs, and emits learning curves, a classification report, and a normalized
+  confusion-matrix PNG.
+- This smoke test is explicitly diagnostic-only. It does not replace exhaustive
+  held-out inference, the complete five-fold supervised baseline, or the SSL
+  comparison, and it creates no synthetic observations.
+
 ## 2026-07-30
 
 ### Completed
