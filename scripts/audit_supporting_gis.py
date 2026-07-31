@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import struct
 from pathlib import Path
 
 import pandas as pd
@@ -12,6 +13,22 @@ import yaml
 
 
 LOCKED = "locked_field2_external_validation"
+SHAPE_TYPES = {
+    0: "Null",
+    1: "Point",
+    3: "PolyLine",
+    5: "Polygon",
+    8: "MultiPoint",
+    11: "PointZ",
+    13: "PolyLineZ",
+    15: "PolygonZ",
+    18: "MultiPointZ",
+    21: "PointM",
+    23: "PolyLineM",
+    25: "PolygonM",
+    28: "MultiPointM",
+    31: "MultiPatch",
+}
 
 
 def plot_id(path: str) -> int | None:
@@ -34,6 +51,59 @@ def access_role(relative_path: str, category: str) -> str:
     return "unassigned_support"
 
 
+def read_shapefile_metadata(path: Path) -> dict[str, object]:
+    """Read SHP/DBF/PRJ metadata without optional GIS dependencies."""
+    with path.open("rb") as stream:
+        header = stream.read(100)
+        if len(header) != 100 or struct.unpack(">i", header[:4])[0] != 9994:
+            raise ValueError("invalid SHP header")
+        declared_code = struct.unpack("<i", header[32:36])[0]
+        bounds = struct.unpack("<4d", header[36:68])
+        observed_codes: set[int] = set()
+        feature_count = 0
+        while record_header := stream.read(8):
+            if len(record_header) != 8:
+                raise ValueError("truncated SHP record header")
+            _, content_words = struct.unpack(">2i", record_header)
+            content = stream.read(content_words * 2)
+            if len(content) != content_words * 2:
+                raise ValueError("truncated SHP record")
+            if len(content) >= 4:
+                observed_codes.add(struct.unpack("<i", content[:4])[0])
+            feature_count += 1
+
+    dbf_path = path.with_suffix(".dbf")
+    with dbf_path.open("rb") as stream:
+        dbf_header = stream.read(32)
+        if len(dbf_header) != 32:
+            raise ValueError("invalid DBF header")
+        dbf_rows = struct.unpack("<I", dbf_header[4:8])[0]
+        header_length = struct.unpack("<H", dbf_header[8:10])[0]
+        field_bytes = stream.read(max(header_length - 33, 0))
+        fields = []
+        for offset in range(0, len(field_bytes), 32):
+            descriptor = field_bytes[offset:offset + 32]
+            if len(descriptor) < 32 or descriptor[0] == 0x0D:
+                break
+            name = descriptor[:11].split(b"\x00", 1)[0].decode("latin-1")
+            field_type = chr(descriptor[11])
+            fields.append(f"{name}:{field_type}")
+
+    prj_path = path.with_suffix(".prj")
+    crs = prj_path.read_text(errors="replace").strip() if prj_path.exists() else ""
+    return {
+        "feature_count": feature_count,
+        "dbf_record_count": dbf_rows,
+        "declared_geometry": SHAPE_TYPES.get(declared_code, f"Unknown({declared_code})"),
+        "observed_geometry_types": "|".join(
+            SHAPE_TYPES.get(code, f"Unknown({code})") for code in sorted(observed_codes)
+        ),
+        "attribute_fields": "|".join(fields),
+        "crs": crs,
+        "bounds": bounds,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--paths", required=True, type=Path)
@@ -43,14 +113,6 @@ def main() -> None:
         help="Defaults to metadata/local/onedrive_archive_inventory.csv",
     )
     args = parser.parse_args()
-
-    try:
-        import fiona
-    except ImportError as error:
-        raise SystemExit(
-            "Fiona is required for vector metadata inspection. Install it in the "
-            "chickpea_modeling environment with: conda install -c conda-forge fiona"
-        ) from error
 
     config = yaml.safe_load(args.paths.read_text())
     project = Path(config["project_root"])
@@ -77,34 +139,29 @@ def main() -> None:
         relative = str(row["relative_path"])
         path = source / relative
         try:
-            with fiona.open(path) as dataset:
-                geometry_types = sorted({
-                    feature["geometry"]["type"]
-                    for feature in dataset
-                    if feature["geometry"] is not None
-                })
-                crs = dataset.crs_wkt or str(dataset.crs)
-                bounds = dataset.bounds
-                vector_rows.append({
+            metadata = read_shapefile_metadata(path)
+            bounds = metadata.pop("bounds")
+            vector_rows.append({
+                "relative_path": relative,
+                "category": row["category"],
+                "plot_id": plot_id(relative),
+                "driver": "ESRI Shapefile",
+                **metadata,
+                "bounds_left": bounds[0],
+                "bounds_bottom": bounds[1],
+                "bounds_right": bounds[2],
+                "bounds_top": bounds[3],
+                "content_role": row["access_role"],
+            })
+            if not metadata["crs"]:
+                issues.append({"relative_path": relative, "issue": "missing_crs"})
+            if metadata["feature_count"] == 0:
+                issues.append({"relative_path": relative, "issue": "zero_features"})
+            if metadata["feature_count"] != metadata["dbf_record_count"]:
+                issues.append({
                     "relative_path": relative,
-                    "category": row["category"],
-                    "plot_id": plot_id(relative),
-                    "driver": dataset.driver,
-                    "feature_count": len(dataset),
-                    "declared_geometry": dataset.schema.get("geometry", ""),
-                    "observed_geometry_types": "|".join(geometry_types),
-                    "attribute_fields": "|".join(dataset.schema.get("properties", {}).keys()),
-                    "crs": crs,
-                    "bounds_left": bounds[0],
-                    "bounds_bottom": bounds[1],
-                    "bounds_right": bounds[2],
-                    "bounds_top": bounds[3],
-                    "content_role": row["access_role"],
+                    "issue": "shp_dbf_record_count_mismatch",
                 })
-                if not crs:
-                    issues.append({"relative_path": relative, "issue": "missing_crs"})
-                if len(dataset) == 0:
-                    issues.append({"relative_path": relative, "issue": "zero_features"})
         except Exception as error:  # report corrupt/unreadable GIS without stopping batch
             issues.append({"relative_path": relative, "issue": f"read_error: {error}"})
 
