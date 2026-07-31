@@ -167,6 +167,16 @@ corrections.
   multiband/continuous RGB and desktop products are visualization-only.
 - The non-desktop combined Cube 20 mask is categorical (0/1/2/3). Added aligned
   agreement tests against each binary variant before selecting or deriving masks.
+- Cube 20 mask provenance resolved: refined weed exactly matches categorical
+  class 3 (IoU 1.0); both soil variants contain all categorical soil plus the
+  same 10,145 extra pixels (IoU 0.982005); chickpea binary variants disagree and
+  are rejected. The categorical mask is frozen as the sole three-class source.
+- On the reflectance grid the categorical source yields 537,983 soil, 43,407
+  chickpea, and 231,017 weed pixels. Added deterministic nearest-neighbor
+  materialization with hashes and mutual-exclusivity checks; raw files stay intact.
+- All 35 numbered plots fall completely within the 1.5 m buffered bounding box of
+  the field boundary candidate. This supports Field 1 identity, while exact
+  polygon containment remains the final gate before spatial label constraints.
 - Corrected plot interpretation: current-cube coverage is not field identity.
   Named Field 1 boundary support and cube coverage are now reported separately;
   exact polygon containment remains required before geometric label refinement.
