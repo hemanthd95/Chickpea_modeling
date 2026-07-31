@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from collections import Counter
 from pathlib import Path
@@ -22,6 +23,14 @@ def read_label_column(path: Path) -> tuple[np.ndarray, Counter]:
         chunks.append(finite)
         counts.update(finite.tolist())
     return np.concatenate(chunks) if chunks else np.array([], dtype=np.int16), counts
+
+
+def full_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(8 * 1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def read_binary_mask(path: Path, height: int, width: int) -> tuple[np.ndarray | None, list[int]]:
@@ -59,7 +68,7 @@ def main() -> None:
     label_root = Path(config["field1"]["label_csvs"])
     mask_root = Path(config["field1"]["masks_emmanuel"])
     label_audit: list[dict[str, object]] = []
-    overlap_rows: list[dict[str, object]] = []
+    count_match_rows: list[dict[str, object]] = []
     variant_rows: list[dict[str, object]] = []
 
     label_rows = catalog[catalog["file_role"] == "label_table"]
@@ -67,7 +76,8 @@ def main() -> None:
         cube = label_row["cube_id_inferred"]
         height = dimensions[cube]["lines"]
         width = dimensions[cube]["samples"]
-        values, counts = read_label_column(label_root / label_row["relative_path"])
+        label_path = label_root / label_row["relative_path"]
+        values, counts = read_label_column(label_path)
         expected = height * width
         matches = len(values) == expected
         label_audit.append({
@@ -76,12 +86,11 @@ def main() -> None:
             "rows": len(values),
             "expected_pixels": expected,
             "row_count_match": matches,
+            "table_type": "full_raster" if matches else "labeled_pixel_table",
             "label_values": json.dumps(sorted(counts)),
             "label_counts": json.dumps(dict(sorted(counts.items()))),
+            "sha256": full_sha256(label_path),
         })
-        if not matches:
-            continue
-        label_image = values.reshape(height, width)
         cube_masks = catalog[
             (catalog["cube_id_inferred"] == cube)
             & catalog["file_role"].isin(["chickpea_mask", "weed_mask", "soil_mask"])
@@ -93,20 +102,27 @@ def main() -> None:
                 mask_root / mask_row["relative_path"], height, width
             )
             if mask is None:
-                overlap_rows.append({
+                count_match_rows.append({
                     "cube_id": cube, "label_value": "", "mask_role": mask_row["file_role"],
-                    "mask_path": mask_row["relative_path"], "iou": "",
+                    "mask_path": mask_row["relative_path"], "label_count": "",
+                    "mask_positive_pixels": "", "absolute_difference": "",
+                    "relative_difference": "",
                     "status": f"invalid_binary_mask:{unique[:20]}",
                 })
                 continue
             valid_masks.append((mask_row["file_role"], mask_row["relative_path"], mask))
             for label_value in sorted(counts):
-                overlap_rows.append({
+                label_count = counts[label_value]
+                mask_count = int(mask.sum())
+                count_match_rows.append({
                     "cube_id": cube,
                     "label_value": label_value,
                     "mask_role": mask_row["file_role"],
                     "mask_path": mask_row["relative_path"],
-                    "iou": iou(label_image == label_value, mask),
+                    "label_count": label_count,
+                    "mask_positive_pixels": mask_count,
+                    "absolute_difference": abs(label_count - mask_count),
+                    "relative_difference": abs(label_count - mask_count) / max(mask_count, 1),
                     "status": "ok",
                 })
         for index, (role_a, path_a, mask_a) in enumerate(valid_masks):
@@ -120,22 +136,24 @@ def main() -> None:
                     })
 
     label_frame = pd.DataFrame(label_audit)
-    overlap_frame = pd.DataFrame(overlap_rows)
+    count_match_frame = pd.DataFrame(count_match_rows)
     variant_frame = pd.DataFrame(
         variant_rows,
         columns=["cube_id", "mask_role", "mask_a", "mask_b", "iou", "identical"],
     )
     label_frame.to_csv(local / "label_deep_audit.csv", index=False)
-    overlap_frame.to_csv(local / "label_mask_overlap.csv", index=False)
+    count_match_frame.to_csv(local / "label_mask_count_match.csv", index=False)
     variant_frame.to_csv(local / "mask_variant_comparison.csv", index=False)
+    hash_duplicates = label_frame[
+        label_frame.duplicated("sha256", keep=False)
+    ].sort_values(["sha256", "cube_id"])
+    hash_duplicates.to_csv(local / "label_sha256_duplicates.csv", index=False)
 
     print(f"Label tables audited: {len(label_frame)}")
-    print(f"Row-count matches: {int(label_frame['row_count_match'].sum())}/{len(label_frame)}")
-    mismatches = label_frame[~label_frame["row_count_match"]]
-    if len(mismatches):
-        print("Row-count mismatches: " + ", ".join(mismatches["cube_id"]))
-    print(f"Label-to-mask comparisons: {len(overlap_frame)}")
+    print("Table structure: labeled-pixel tables (not full raster tables)")
+    print(f"Label-to-mask count comparisons: {len(count_match_frame)}")
     print(f"Same-role mask variant comparisons: {len(variant_frame)}")
+    print(f"Rows in full-SHA duplicate groups: {len(hash_duplicates)}")
     print(f"Reports written to: {local}")
 
 
