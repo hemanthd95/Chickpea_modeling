@@ -34,6 +34,22 @@ sensitivity_masks:
     weed_mask: FIeld 1 Cube 31/weed_mask_Field1_Cube31_gps.tiff
     note: IoU with generated mask is 0.811867; do not silently merge them.
 
+archive_cube20:
+  status: approved_for_deterministic_mask_materialization
+  reflectance: Kusi chickpea project/Kusi cubes analysis trials/kusi_field1_target_Pika_L-GigE_20.bil-Georectify.bip
+  categorical_mask: Kusi chickpea project/Kusi cubes analysis trials/Field_1_Cube20_combined_mask.tiff
+  categorical_labels: {1: soil, 2: chickpea, 3: weed}
+  resampling: nearest
+  evidence:
+    weed_new_iou: 1.0
+    soil_binary_iou: 0.982005
+    chickpea_binary_variants_rejected: true
+  excluded_products:
+    - RGB and multiband visualization masks
+    - DESKTOP copies with continuous display values
+    - original weed mask (IoU 0.209020 with categorical weed)
+  note: Derive all three mutually exclusive masks from the categorical source; never merge binary variants.
+
 rules:
   synthetic_data_allowed: false
   field2_locked: true
@@ -41,4 +57,3 @@ rules:
   raw_files_are_never_modified: true
   mask_precedence_high_to_low: [weed, chickpea, soil]
   precedence_evidence: Weed-soil overlap is zero; Cube 24 chickpea-weed overlap exactly explains its CSV count difference.
-
