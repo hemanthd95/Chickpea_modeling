@@ -29,7 +29,10 @@ def main() -> None:
     wavelengths: np.ndarray | None = None
 
     for _, row in manifest.iterrows():
-        root = Path(config["field1"]["reflectance_dates"][row["acquisition_date"]])
+        batches = config["field1"].get(
+            "reflectance_processing_batches", config["field1"].get("reflectance_dates", {})
+        )
+        root = Path(batches[row["processing_batch"]])
         header = root / row["reflectance_header"]
         data = root / row["reflectance_bip"]
         image = envi.open(str(header), str(data))
@@ -47,6 +50,7 @@ def main() -> None:
         samples.append(spectra)
         cube_rows.append({
             "cube_id": row["cube_id"], "acquisition_date": row["acquisition_date"],
+            "processing_batch": row["processing_batch"],
             "valid_pixels": len(coordinates), "sampled_pixels": count,
             "zero_fraction_sample": float((spectra == 0).mean()),
             "saturation_fraction_sample": float((spectra == 65535).mean()),
