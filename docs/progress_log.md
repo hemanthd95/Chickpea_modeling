@@ -174,6 +174,14 @@ corrections.
 - On the reflectance grid the categorical source yields 537,983 soil, 43,407
   chickpea, and 231,017 weed pixels. Added deterministic nearest-neighbor
   materialization with hashes and mutual-exclusivity checks; raw files stay intact.
+- Materialization passed: four distinct hashed products were written on the exact
+  989×1517 grid with zero class overlap and 687,906 unlabeled pixels. Cube 20 is
+  now integrated as archive-recovered provenance, increasing the authoritative
+  collection to 32 reflectance, 19 weed-SSL, and 16 three-class supervised cubes.
+- Exact field-boundary containment is 100% for 32 plots; plots 10, 19, and 64 are
+  76.76%, 91.74%, and 81.42% inside, respectively, but all reach 100% within the
+  1.5 m field-identity tolerance. This tolerance is explicitly prohibited from
+  serving as the chickpea constraint buffer.
 - All 35 numbered plots fall completely within the 1.5 m buffered bounding box of
   the field boundary candidate. This supports Field 1 identity, while exact
   polygon containment remains the final gate before spatial label constraints.
