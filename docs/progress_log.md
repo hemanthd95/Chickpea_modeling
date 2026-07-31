@@ -221,6 +221,22 @@ corrections.
 - Proposed a 0.30 m sampling exclusion around future fold boundaries and recorded
   it as a candidate, not a frozen decision. Field 2 remains unopened.
 
+### Spatial-index findings and report organization
+
+- Indexed 221 unique 5 m map-coordinate groups across the 32 Field 1 cubes; 147
+  groups (66.5%) occur in multiple cubes and 70 cube pairs share at least one
+  group. All cubes belong to one overlap-connected component.
+- The indexed footprint spans approximately 92.44 m east–west and 87.43 m
+  north–south in EPSG:32617. Pixel size is 1.5 cm for 31 cubes and 2.0 cm for one
+  cube.
+- Cube-held-out evaluation is rejected as the primary split because overlapping
+  cubes connect the full collection and 82.4% of cube-group membership records
+  occur on repeated ground.
+- Added authoritative class-count summaries by map group so contiguous folds can
+  be optimized for chickpea representation without inspecting Field 2.
+- New reviewable CSVs now write beneath `metadata/local/reports/<stage>/`.
+  Canonical files required by downstream scripts retain their stable locations.
+
 ## 2026-07-30
 
 ### Completed
