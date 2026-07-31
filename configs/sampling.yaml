@@ -9,4 +9,8 @@ ssl_center_classes: [1, 2]
 weed_cluster_center_class: 2
 index_use: training_candidate_pool_only
 primary_evaluation: exhaustive_tiled_inference_on_heldout_masks
+patch_qc:
+  samples_per_class_fold: 100
+  montage_per_class: 6
+  false_color_wavelengths_nm: [800, 650, 550]
 
