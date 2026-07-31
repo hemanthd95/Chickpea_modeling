@@ -80,6 +80,18 @@ corrections.
 - Added RGB/mask preview generation for visual QA before authoritative-manifest
   creation.
 
+### Visual-QA interpretation
+
+- Generated observed-band RGB previews for all 18 labeled cubes.
+- Fourteen cubes supplied three valid binary mask files; Cubes 36, 38, and 39
+  supplied valid weed/soil masks only; Cube 31 supplied the selected masks plus a
+  sensitivity weed variant.
+- The first montage used contours around pixel-level masks, producing excessive
+  visual density. It is retained as a diagnostic but is not treated as proof of
+  mask quality.
+- Added authoritative-manifest construction and full-resolution quantitative
+  checks for class-mask overlaps, missing masks, and unclassified pixels.
+
 ## 2026-07-30
 
 ### Completed
