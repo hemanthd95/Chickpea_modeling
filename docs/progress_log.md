@@ -203,6 +203,24 @@ corrections.
   extracts to a separate data folder, hashes all files, and locks Field 2/tall-
   grass assets from content inspection during Field 1 development.
 
+### Thirty-two-cube spectral verification and spatial grouping
+
+- Reprofiled 320,000 observed spectra across all 32 authoritative cubes after
+  integrating Cube 20. The primary band policy remains indices 3–113 (111 bands,
+  401.84–869.34 nm): saturation is 0.854% at band 113 and 1.543% at band 114.
+- Verified all 32 manifest records use the true 2025-05-06 acquisition date; the
+  June directories remain processing batches only.
+- Across available raw masks, class abundance is approximately chickpea : weed :
+  soil = 1 : 4.00 : 6.76. Supervised metrics therefore require class-balanced
+  reporting rather than overall accuracy alone.
+- Added globally anchored 5 m map-coordinate group indexing. Identical ground
+  locations observed in overlapping cubes receive the same group ID because cube
+  identity is excluded from the key.
+- The index writes cube footprints, cube-to-group membership, and conservative
+  overlap pairs for review. It deliberately does not assign folds yet.
+- Proposed a 0.30 m sampling exclusion around future fold boundaries and recorded
+  it as a candidate, not a frozen decision. Field 2 remains unopened.
+
 ## 2026-07-30
 
 ### Completed
