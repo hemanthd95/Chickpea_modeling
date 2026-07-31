@@ -121,7 +121,10 @@ corrections.
 
 - Safely extracted 520 supporting files into an isolated, ignored raw-data
   directory and recorded per-file SHA-256 hashes.
-- Kept 36 Field 2/tall-grass records locked; their contents and coordinates were
+- Initially identified 36 Field 2/tall-grass records by explicit filenames.
+  A subsequent provenance pass identified three additional Cube 34 GeoTIFF/XML
+  records tied to the Field 2 workflow despite lacking `Field 2` in their names;
+  the corrected lock contains 39 records. Their contents and coordinates were
   not interpreted.
 - Confirmed all 81 observed shapefile datasets contain the required SHP, SHX,
   DBF, and PRJ components.
@@ -129,7 +132,8 @@ corrections.
   an observed subset, not assumed missing plots, until the experimental design
   and combined-plot layer are inspected.
 - Added a metadata-only supporting GIS audit. It inspects unlocked Field 1
-  geometry, CRS, feature counts, and schemas while never opening locked records.
+  geometry, CRS, feature counts, and schemas while never opening locked or
+  unassigned records (including Project 50/51 until their role is confirmed).
 
 ### Spectral profile and supporting archive
 
