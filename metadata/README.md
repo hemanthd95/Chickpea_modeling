@@ -10,7 +10,11 @@ contain absolute paths or data-derived records. Keep two kinds of output separat
 Current report stages:
 
 - `spatial_grouping/`: cube footprints, overlap, group membership, and group-level
-  authoritative class counts.
+  authoritative class counts, accompanied by a PNG visual-QC overview.
+
+Major analytical stages should emit a clearly named PNG preview alongside their
+tabular reports whenever spatial or statistical structure can be meaningfully
+visualized. A PNG supports investigator review but never replaces numeric QC.
 
 Raw imagery and source masks never belong in metadata directories. Report folders
 may be deleted and regenerated from the documented scripts.
