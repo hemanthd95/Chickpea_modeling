@@ -57,7 +57,17 @@ are intentionally not versioned.
 See `docs/study_protocol.md` for the preregistered analysis logic and
 `docs/progress_log.md` for the daily record.
 
-Then run the leakage-safe starter experiment:
+Build and review the globally anchored Field 1 spatial-group index before any model split:
+
+```bash
+python scripts/build_spatial_group_index.py \\
+  --paths configs/paths.local.yaml \\
+  --config configs/spatial_splits.yaml
+```
+
+This step assigns no folds. Review the footprint, membership, and overlap reports in
+`metadata/local/` before freezing cross-validation folds. Then run the leakage-safe
+starter experiment:
 
 ```bash
 python -m chickpea_ssl.train --config configs/experiment.yaml
