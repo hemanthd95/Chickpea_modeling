@@ -6,10 +6,19 @@ grouping:
   origin_y_m: 0.0
 
 candidate_split:
-  status: review_spatial_group_index_before_freezing
+  status: optimize_then_review_before_freezing
   folds: 5
   seed: 42
+  angle_step_degrees: 5
+  minimum_groups_per_fold: 20
+  minimum_labeled_groups_per_fold: 10
+  balance_weights:
+    spatial_groups: 0.5
+    labeled_groups: 0.5
+    soil: 1.0
+    chickpea: 3.0
+    weed: 1.0
+    all_labels: 0.5
   # Reserved around fold boundaries during sampling. This exceeds the half-width
   # of a 15-pixel patch at the observed 1.5 cm Cube 20 resolution.
   boundary_exclusion_m: 0.30
-
