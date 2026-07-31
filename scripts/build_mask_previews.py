@@ -90,6 +90,7 @@ def main() -> None:
     catalog = pd.read_csv(local / "project_catalog.csv", dtype=str).fillna("")
 
     completed: list[dict[str, object]] = []
+    overview_tiles: list[tuple[str, np.ndarray]] = []
     label_cubes = sorted(catalog.loc[catalog["file_role"] == "label_table", "cube_id_inferred"].unique())
     for cube in label_cubes:
         reflectance = catalog[
@@ -119,11 +120,23 @@ def main() -> None:
         for axis in axes: axis.axis("off")
         figure.savefig(output / f"{cube}.png", dpi=160)
         plt.close(figure)
+        overview_step = max(1, math.ceil(max(preview.shape[:2]) / 320))
+        overview_tiles.append((cube, preview[::overview_step, ::overview_step]))
         completed.append({"cube_id": cube, "valid_mask_files": len(valid),
                           "skipped_mask_files": len(skipped), "skipped": " | ".join(skipped)})
     pd.DataFrame(completed).to_csv(local / "mask_preview_summary.csv", index=False)
+    rows = math.ceil(len(overview_tiles) / 3)
+    overview, axes = plt.subplots(rows, 3, figsize=(12, 4 * rows), constrained_layout=True)
+    for axis in np.asarray(axes).reshape(-1):
+        axis.axis("off")
+    for axis, (cube, tile) in zip(np.asarray(axes).reshape(-1), overview_tiles):
+        axis.imshow(tile)
+        axis.set_title(cube)
+    overview.savefig(local / "mask_preview_overview.png", dpi=160)
+    plt.close(overview)
     print(f"Created {len(completed)} cube previews in {output}")
     print(f"Summary: {local / 'mask_preview_summary.csv'}")
+    print(f"Overview: {local / 'mask_preview_overview.png'}")
 
 
 if __name__ == "__main__":
