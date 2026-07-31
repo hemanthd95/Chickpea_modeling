@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -12,6 +13,14 @@ import pandas as pd
 import yaml
 
 MASK_ROLES = ("chickpea_mask", "weed_mask", "soil_mask")
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(8 * 1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def valid_binary_rows(mask_qc: pd.DataFrame, cube: str, role: str,
@@ -80,6 +89,8 @@ def main() -> None:
             "cube_id": cube,
             "acquisition_date": header_row["acquisition_date"],
             "processing_batch": header_row.get("processing_batch", ""),
+            "reflectance_source": "processing_batch",
+            "mask_source": "emmanuel",
             "reflectance_header": header_row["relative_path"],
             "reflectance_bip": header_row["relative_path"][:-4],
             "height": height,
@@ -135,6 +146,59 @@ def main() -> None:
             "chickpea_weed_overlap": pair_overlap(chickpea, weed),
             "chickpea_soil_overlap": pair_overlap(chickpea, soil),
             "weed_soil_overlap": pair_overlap(weed, soil),
+            "overlap_fraction_of_union": float((conflict > 1).sum() / max(union.sum(), 1)),
+        })
+
+    archive_decision = decisions.get("archive_cube20", {})
+    processed_qc_path = local / "archive_cube20_processed_mask_qc.csv"
+    if archive_decision.get("status") == "approved_for_deterministic_mask_materialization" and processed_qc_path.is_file():
+        archive_root = project / "data" / "OneDrive_2026-07-31_raw"
+        reflectance_data = archive_root / archive_decision["reflectance"]
+        reflectance_header = Path(f"{reflectance_data}.hdr")
+        processed = project / "data" / "processed" / "field1_cube20"
+        masks = {role: processed / f"{role}.tif" for role in ("chickpea", "weed", "soil")}
+        required = [reflectance_data, reflectance_header, *masks.values()]
+        missing = [str(path) for path in required if not path.is_file()]
+        if missing:
+            raise FileNotFoundError(f"Approved Cube 20 products are missing: {missing}")
+        processed_qc = pd.read_csv(processed_qc_path).set_index("relative_path")
+        for path in masks.values():
+            relative = str(path.relative_to(project))
+            if relative not in processed_qc.index or sha256(path) != processed_qc.loc[relative, "sha256"]:
+                raise ValueError(f"Cube 20 processed-mask hash mismatch: {relative}")
+        selected_arrays = {f"{role}_mask": load_bool(path) for role, path in masks.items()}
+        height, width = selected_arrays["chickpea_mask"].shape
+        manifest_rows.append({
+            "cube_id": "field1_cube20",
+            "acquisition_date": str(config["field1"].get("acquisition_date", "2025-05-06")),
+            "processing_batch": "archive_recovered_2026-07-31",
+            "reflectance_source": "archive_cube20", "mask_source": "project_relative",
+            "reflectance_header": str(reflectance_header.relative_to(archive_root)),
+            "reflectance_bip": str(reflectance_data.relative_to(archive_root)),
+            "height": height, "width": width, "bands": 150,
+            "chickpea_mask": str(masks["chickpea"].relative_to(project)),
+            "chickpea_mask_status": "derived_from_authoritative_categorical_mask",
+            "weed_mask": str(masks["weed"].relative_to(project)),
+            "weed_mask_status": "derived_from_authoritative_categorical_mask",
+            "soil_mask": str(masks["soil"].relative_to(project)),
+            "soil_mask_status": "derived_from_authoritative_categorical_mask",
+            "label_table": "", "label_table_status": "not_available",
+            "weed_ssl_ready": True, "raster_supervised_ready": True,
+            "legacy_table_ready": False,
+        })
+        chickpea, weed, soil = (selected_arrays[f"{role}_mask"] for role in ("chickpea", "weed", "soil"))
+        conflict = chickpea.astype(np.uint8) + weed.astype(np.uint8) + soil.astype(np.uint8)
+        union = conflict > 0
+        spatial_rows.append({
+            "cube_id": "field1_cube20", "available_masks": 3,
+            "chickpea_pixels": int(chickpea.sum()), "weed_pixels": int(weed.sum()),
+            "soil_pixels": int(soil.sum()), "union_pixels": int(union.sum()),
+            "unclassified_pixels": int((~union).sum()),
+            "overlap_pixels": int((conflict > 1).sum()),
+            "triple_overlap_pixels": int((conflict > 2).sum()),
+            "chickpea_weed_overlap": int((chickpea & weed).sum()),
+            "chickpea_soil_overlap": int((chickpea & soil).sum()),
+            "weed_soil_overlap": int((weed & soil).sum()),
             "overlap_fraction_of_union": float((conflict > 1).sum() / max(union.sum(), 1)),
         })
 
