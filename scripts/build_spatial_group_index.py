@@ -51,6 +51,8 @@ def main() -> None:
     paths = yaml.safe_load(args.paths.read_text())
     project = Path(paths["project_root"])
     local = project / "metadata" / "local"
+    reports = local / "reports" / "spatial_grouping"
+    reports.mkdir(parents=True, exist_ok=True)
     manifest = args.manifest or local / "authoritative_manifest.csv"
     configuration = yaml.safe_load(args.config.read_text())["grouping"]
     block_size = float(configuration["block_size_m"])
@@ -116,19 +118,18 @@ def main() -> None:
     overlap_frame = pd.DataFrame(overlap_rows, columns=[
         "cube_a", "cube_b", "shared_spatial_groups", "fraction_of_smaller_cube_groups"
     ]).sort_values(["shared_spatial_groups", "cube_a", "cube_b"], ascending=[False, True, True])
-    footprint_frame.to_csv(local / "spatial_cube_footprints.csv", index=False)
-    membership_frame.to_csv(local / "spatial_group_membership.csv", index=False)
-    overlap_frame.to_csv(local / "spatial_cube_overlap.csv", index=False)
+    footprint_frame.to_csv(reports / "spatial_cube_footprints.csv", index=False)
+    membership_frame.to_csv(reports / "spatial_group_membership.csv", index=False)
+    overlap_frame.to_csv(reports / "spatial_cube_overlap.csv", index=False)
 
     repeated = membership_frame.groupby("spatial_group_id")["cube_id"].nunique()
     print(f"Cubes indexed: {len(footprint_frame)}")
     print(f"Unique {block_size:g} m spatial groups: {membership_frame['spatial_group_id'].nunique()}")
     print(f"Groups observed by multiple cubes: {int((repeated > 1).sum())}")
     print(f"Overlapping cube pairs: {len(overlap_frame)}")
-    print(f"Reports written to: {local}")
+    print(f"Reports written to: {reports}")
     print("No fold assignment was made; Field 2 was not opened.")
 
 
 if __name__ == "__main__":
     main()
-
