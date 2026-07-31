@@ -75,6 +75,9 @@ smoothing protocol.
 ## Leakage controls
 
 - No random pixel split.
+- Because adjacent 30 m AGL swaths overlap at 7 m flight-line spacing, all
+  observations of the same mapped ground area must share one split. Split IDs
+  are assigned in map coordinates, not independently by cube.
 - No neighboring-patch overlap across train/test spatial blocks.
 - No global normalization fitted using validation or Field 2.
 - No cluster-number tuning against Field 2 RTK outcomes.
