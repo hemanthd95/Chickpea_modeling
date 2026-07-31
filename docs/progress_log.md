@@ -290,6 +290,22 @@ corrections.
   a PNG spectral diagnostic. Unlabeled Field 1 pixels remain eligible because the
   SSL representation task is unsupervised. Field 2 remains locked.
 
+### Normalization passed and sample indexing staged
+
+- Fold-specific normalization used 640,000 cube-balanced valid spectra. Training
+  sample counts range from 489,451 to 519,519; boundary exclusion removes only
+  0.61–1.45% of the sampled pool.
+- Across retained bands, fold-specific mean curves differ by about 0.7–2.4% on
+  average. The largest relative mean spread is 6.37% near 677.65 nm. All bands
+  have nonzero variance; no scaling instability was detected.
+- Added an observed-only sample-centre index capped within cube × map group ×
+  class strata. The cap controls training imbalance without synthesizing pixels.
+- Each centre records fold, class, patch-edge validity, and separate training- and
+  validation-side safety for every held-out fold under the 0.30 m boundary rule.
+- The centre index is explicitly training-candidate-only. Primary evaluation will
+  use exhaustive tiled prediction on held-out authoritative masks so test
+  prevalence is not altered by balanced sampling.
+
 ## 2026-07-30
 
 ### Completed
