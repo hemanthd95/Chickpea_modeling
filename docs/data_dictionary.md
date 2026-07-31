@@ -5,7 +5,7 @@
 | `field1.derived_ssl` | PCA, PCA-component differences, NDVI, masks | Legacy/baseline analysis |
 | `field1.label_csvs` | Cube-level chickpea, weed, and soil mask details | Label audit and supervised baselines |
 | `field1.masks_emmanuel` | Completed Field 1 mask products | Development labels |
-| `field1.reflectance_dates` | Original georectified Pika-L cubes and ENVI headers | Primary model inputs |
+| `field1.reflectance_processing_batches` | Original georectified Pika-L cubes grouped by student processing date | Primary model inputs; all acquired 2025-05-06 |
 | `field2.imagery` | Untouched Field 2 imagery | Locked external deployment |
 | `field2.tall_grass_rtk` | RTK tall-grass coordinates | Revealed only after model freeze |
 
