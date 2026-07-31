@@ -39,4 +39,6 @@ rules:
   field2_locked: true
   invalid_masks_are_never_thresholded_automatically: true
   raw_files_are_never_modified: true
+  mask_precedence_high_to_low: [weed, chickpea, soil]
+  precedence_evidence: Weed-soil overlap is zero; Cube 24 chickpea-weed overlap exactly explains its CSV count difference.
 
