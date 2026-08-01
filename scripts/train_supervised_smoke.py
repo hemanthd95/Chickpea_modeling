@@ -8,6 +8,7 @@ import hashlib
 from pathlib import Path
 import random
 import sys
+import time
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -147,15 +148,29 @@ def main() -> None:
     history = []
     best_f1 = -1.0
     best_path = output / "best_model.pt"
-    for epoch in range(1, int(training["epochs"]) + 1):
-        model.train(); loss_sum = 0.0; seen = 0
-        for patches, labels in train_loader:
+    total_epochs = int(training["epochs"])
+    log_every = int(training.get("log_every_batches", 10))
+    print(
+        f"Starting diagnostic on {device} with {gpu_count} visible GPU(s): "
+        f"train={len(train):,}, validation={len(validation):,}, "
+        f"batches/epoch={len(train_loader):,}"
+    )
+    for epoch in range(1, total_epochs + 1):
+        model.train(); loss_sum = 0.0; seen = 0; epoch_start = time.monotonic()
+        for batch_number, (patches, labels) in enumerate(train_loader, start=1):
             patches, labels = patches.to(device, non_blocking=True), labels.to(device, non_blocking=True)
             optimizer.zero_grad(set_to_none=True)
             with torch.amp.autocast(device_type=device.type, enabled=amp):
                 logits = model(patches); loss = criterion(logits, labels)
             scaler.scale(loss).backward(); scaler.step(optimizer); scaler.update()
             loss_sum += float(loss.item()) * len(labels); seen += len(labels)
+            if batch_number == 1 or batch_number % log_every == 0 or batch_number == len(train_loader):
+                elapsed = time.monotonic() - epoch_start
+                print(
+                    f"Epoch {epoch}/{total_epochs} batch {batch_number}/{len(train_loader)} "
+                    f"loss={loss_sum / seen:.4f} elapsed={elapsed / 60:.1f} min",
+                    flush=True,
+                )
         validation_loss, truth, predicted = evaluate(model, validation_loader, device)
         macro_f1 = f1_score(truth, predicted, average="macro")
         row = {
@@ -165,7 +180,7 @@ def main() -> None:
             "validation_balanced_accuracy": balanced_accuracy_score(truth, predicted),
             "validation_macro_f1": macro_f1,
         }
-        history.append(row); print(row)
+        history.append(row); print(row, flush=True)
         if macro_f1 > best_f1:
             best_f1 = macro_f1
             state = model.module.state_dict() if isinstance(model, nn.DataParallel) else model.state_dict()
