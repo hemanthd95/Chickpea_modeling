@@ -1,16 +1,17 @@
 diagnostic_only: true
 seed: 42
 heldout_fold: 1
-samples_per_training_class: 20000
-samples_per_validation_class: 5000
+samples_per_training_class: 5000
+samples_per_validation_class: 2000
 model:
   embedding_dim: 128
 training:
-  epochs: 5
-  batch_size: 512
+  epochs: 3
+  batch_size: 1024
   learning_rate: 0.0003
   weight_decay: 0.0001
   num_workers: 8
+  log_every_batches: 10
   mixed_precision: true
   use_all_visible_gpus: true
 output_dir: results/supervised_smoke_fold1
