@@ -349,6 +349,20 @@ corrections.
   held-out inference, the complete five-fold supervised baseline, or the SSL
   comparison, and it creates no synthetic observations.
 
+
+### First GPU diagnostic interrupted and workload corrected
+
+- The initial supervised smoke test was manually stopped after 34 minutes because
+  no epoch had completed. Both RTX 5000 Ada GPUs were active, but memory use was
+  below 1 GiB per device and random multi-cube ENVI patch reads made the pipeline
+  input-bound. No result or model-performance claim was retained.
+- Reduced the diagnostic to 5,000 observed training patches and 2,000 observed
+  validation patches per class for three epochs, increased the batch size to
+  1,024, and added batch-level elapsed-time reporting. The revised run remains
+  balanced, spatially held out, GPU accelerated, and diagnostic-only.
+- The full benchmark will not inherit this convenience subsample. Its loader must
+  be redesigned for cube-local reads or cached shards before five-fold training.
+
 ## 2026-07-30
 
 ### Completed
