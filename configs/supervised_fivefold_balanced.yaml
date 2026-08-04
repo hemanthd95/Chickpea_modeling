@@ -1,0 +1,19 @@
+base_training_config: configs/supervised_architecture_ablation.yaml
+architecture_contract: field1_supervised_architecture_contract.yaml
+
+heldout_folds: [1, 2, 3, 4, 5]
+gpu_indices: [0, 1]
+skip_completed_folds: true
+
+architectures:
+  - center_spectrum_mlp
+  - spatial_average_cnn
+  - center_context_fusion
+model_seeds: [42, 43, 44]
+
+samples_per_training_class: 20000
+samples_per_validation_class: 5000
+
+per_fold_report_stage: models/supervised_fivefold_balanced/folds
+aggregate_report_stage: models/supervised_fivefold_balanced
+per_fold_output_dir: results/supervised_fivefold_balanced
