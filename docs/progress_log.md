@@ -4,6 +4,21 @@ Append a dated entry for every work session that changes data interpretation,
 code, experimental design, or results. Do not rewrite prior entries; append
 corrections.
 
+## 2026-08-04
+
+### Multi-GPU stall isolated for hardware benchmarking
+
+- The revised diagnostic again produced no completed batch after 20 minutes.
+  Interruption occurred inside PyTorch `DataParallel.parallel_apply` during the
+  model forward pass, after the DataLoader had supplied a batch.
+- System memory was healthy (120 GiB available, no swap use), and no Python
+  process remained after interruption. This evidence supersedes the provisional
+  disk-cache diagnosis.
+- Added a short independent per-GPU training-step benchmark to compare both RTX
+  5000 Ada devices under deterministic and cuDNN-autotuned execution before
+  changing the scientific training pipeline. Benchmark tensors are engineering
+  inputs only and can never enter fitted models or reported scientific results.
+
 ## 2026-07-31
 
 ### Started
