@@ -512,3 +512,30 @@ corrections.
   It is explicitly not the later exhaustive held-out-mask evaluation and does
   not access Field 2.
 
+### Balanced five-fold supervised benchmark passed
+
+- Completed all 45 frozen runs (five spatial folds × three architectures × three
+  seeds) using independent workers on both RTX 5000 Ada GPUs. The run completed
+  substantially faster than the conservative estimate, confirming that the
+  corrected loader and cached data path are no longer the training bottleneck.
+- Center-context fusion ranked first in every held-out fold. Across the 15 nested
+  fold × seed runs, mean macro-F1 was 0.687735 versus 0.661296 for
+  spatial-average CNN and 0.624518 for center-spectrum MLP.
+- Fusion improved over spatial-average CNN by 0.026439 absolute (4.00% relative).
+  Fold-mean gains were positive in all five folds and ranged from 0.015684 to
+  0.038847.
+- Fusion improved mean soil F1 by 0.039971 and weed F1 by 0.045033 relative to
+  spatial-average CNN. Chickpea F1 was effectively tied but slightly lower
+  (0.526116 versus 0.531804; delta -0.005688).
+- Fold geography dominates seed variability: fusion's within-fold seed SD was
+  0.001021–0.009114, while its across-run SD was 0.050069. Chickpea remains the
+  unstable class (fusion F1 SD 0.113815), ranging from fold means 0.393987 to
+  0.665918.
+- Worst-cube macro-F1 remains weak and must be audited for cube-level class
+  support before interpretation. The next evaluation contract will distinguish
+  exhaustive pixel-observation, spatial-group-balanced, cube-level, and
+  overlap-sensitivity results; folds, not the 15 nested runs, are the primary
+  independent units for uncertainty.
+- These results validate the supervised architecture choice but do not test
+  hidden weed subclasses or the SSL hypothesis. Field 2 remains unopened.
+
