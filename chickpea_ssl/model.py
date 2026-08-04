@@ -58,6 +58,72 @@ class SupervisedClassifier(nn.Module):
         return self.classifier(self.encoder(x))
 
 
+
+class CenterSpectrumMLP(nn.Module):
+    """Classify the authoritative center pixel from its spectrum alone."""
+
+    def __init__(self, in_channels: int = 111, hidden_dim: int = 256,
+                 embedding_dim: int = 128, classes: int = 3,
+                 dropout: float = 0.1):
+        super().__init__()
+        self.network = nn.Sequential(
+            nn.Linear(in_channels, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, embedding_dim),
+            nn.LayerNorm(embedding_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(embedding_dim, classes),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        center_row, center_column = x.shape[-2] // 2, x.shape[-1] // 2
+        return self.network(x[:, :, center_row, center_column])
+
+
+class CenterContextClassifier(nn.Module):
+    """Fuse the center spectrum with a learned spatial-context representation."""
+
+    def __init__(self, in_channels: int = 111, center_dim: int = 128,
+                 context_dim: int = 128, fusion_dim: int = 128,
+                 classes: int = 3, dropout: float = 0.1):
+        super().__init__()
+        self.center = nn.Sequential(
+            nn.Linear(in_channels, center_dim),
+            nn.LayerNorm(center_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+        )
+        self.context = SmallSpectralSpatialEncoder(in_channels, context_dim)
+        self.classifier = nn.Sequential(
+            nn.Linear(center_dim + context_dim, fusion_dim),
+            nn.LayerNorm(fusion_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(fusion_dim, classes),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        center_row, center_column = x.shape[-2] // 2, x.shape[-1] // 2
+        center = self.center(x[:, :, center_row, center_column])
+        context = self.context(x)
+        return self.classifier(torch.cat((center, context), dim=1))
+
+
+def build_supervised_model(
+    architecture: str, in_channels: int = 111, classes: int = 3
+) -> nn.Module:
+    """Construct one declared supervised architecture for controlled ablations."""
+    if architecture == "center_spectrum_mlp":
+        return CenterSpectrumMLP(in_channels=in_channels, classes=classes)
+    if architecture == "spatial_average_cnn":
+        return SupervisedClassifier(in_channels=in_channels, classes=classes)
+    if architecture == "center_context_fusion":
+        return CenterContextClassifier(in_channels=in_channels, classes=classes)
+    raise ValueError(f"Unknown supervised architecture: {architecture}")
+
 def nt_xent(z1: torch.Tensor, z2: torch.Tensor, temperature: float = 0.2) -> torch.Tensor:
     n = z1.shape[0]
     z = torch.cat((z1, z2), dim=0)
