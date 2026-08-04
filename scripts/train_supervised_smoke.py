@@ -262,7 +262,7 @@ def main() -> None:
         config.get("run_title", "Supervised spectral-spatial pipeline diagnostic"),
         fontsize=14,
     )
-    preview = reports / "supervised_smoke_overview.png"
+    preview = reports / config.get("overview_filename", "supervised_smoke_overview.png")
     figure.savefig(preview, dpi=200); plt.close(figure)
     run_summary = {
         "status": "diagnostic_only",
