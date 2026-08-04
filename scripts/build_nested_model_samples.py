@@ -100,6 +100,10 @@ def main() -> None:
     protocol = yaml.safe_load(protocol_path.read_text())
     if protocol.get("status") != "supervised_primary_evaluation_protocol_frozen":
         raise ValueError("Primary evaluation protocol is not frozen")
+    if sha256(args.protocol) != protocol["configuration_sha256"]:
+        raise ValueError(
+            "Primary evaluation configuration differs from its frozen contract"
+        )
     if sha256(roles_path) != protocol["nested_role_table_sha256"]:
         raise ValueError("Nested role-table hash mismatch")
 
