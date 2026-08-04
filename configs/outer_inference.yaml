@@ -1,0 +1,21 @@
+status: engineering_pilot_before_primary_outer_evaluation
+field: Field 1
+field2_locked: true
+
+pilot:
+  architecture: center_context_fusion
+  maximum_observed_centers: 20000
+  batch_sizes: [256, 512, 1024]
+  mixed_precision: true
+  maximum_peak_memory_gib: 24.0
+
+primary:
+  seed_ensemble: arithmetic_mean_of_softmax_probabilities
+  save_individual_pixel_probabilities: false
+  accumulate_confusion_by:
+    - outer_fold
+    - frozen_5m_spatial_group
+    - cube
+  cluster_bootstrap_replicates: 1000
+  cluster_bootstrap_seed: 42
+  field2_locked: true
