@@ -539,3 +539,21 @@ corrections.
 - These results validate the supervised architecture choice but do not test
   hidden weed subclasses or the SSL hypothesis. Field 2 remains unopened.
 
+### Nested primary evaluation protocol staged
+
+- Identified an essential distinction between the completed development benchmark
+  and primary evaluation: development runs used outer-fold labels for early
+  stopping and therefore cannot support unbiased outer-fold performance claims.
+- Added a deterministic nested spatial protocol. For each outer test fold, one
+  different spatial fold is reserved for early stopping and the remaining three
+  folds alone supply supervised gradient updates.
+- Primary retraining will also recompute normalization without both outer and
+  inner folds. Outer labels are prohibited from early stopping, threshold tuning,
+  architecture selection, or geometric postprocessing decisions.
+- The frozen protocol specifies three-seed probability ensembles, exhaustive
+  eligible authoritative labeled-pixel observations, equal-weight spatial-group
+  summaries, cube and overlap sensitivity analyses, and 1,000-replicate
+  spatial-group cluster bootstrap uncertainty.
+- Unconstrained predictions remain primary. Plot/alley chickpea constraints are
+  reserved for a declared sensitivity analysis. Field 2 remains locked.
+
