@@ -557,3 +557,18 @@ corrections.
 - Unconstrained predictions remain primary. Plot/alley chickpea constraints are
   reserved for a declared sensitivity analysis. Field 2 remains locked.
 
+### Nested training-only normalization staged
+
+- Added deterministic cube-balanced normalization for the nested primary protocol.
+  For each outer evaluation, both the outer test fold and its separate inner
+  early-stopping fold are excluded from mean, variance, minimum, and maximum
+  calculations.
+- Training-side samples within 0.30 m of either excluded-fold boundary are also
+  removed. This prevents preprocessing statistics or patch neighborhoods from
+  carrying information across Test or Stop boundaries.
+- The stage verifies frozen fold, role-table, protocol, manifest, band-policy, and
+  configuration hashes; rejects zero-variance bands; and emits summary CSVs,
+  spectral mean/SD visual QC, and a local immutable contract.
+- Existing outer-only normalization remains valid for development diagnostics but
+  is prohibited for the nested primary evaluation. Field 2 remains locked.
+
