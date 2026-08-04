@@ -39,6 +39,13 @@ corrections.
 - Training and validation losses decreased through epoch 3 (0.9199 and 0.9701),
   with a small gap and no convergence. The smoke test therefore passes the
   pipeline gate but is prohibited from serving as the supervised baseline.
+- Staged the next Fold-1 convergence diagnostic without overwriting the smoke
+  test: 20,000 observed training and 5,000 observed validation patches per class,
+  up to 20 epochs, minimum six epochs, and macro-F1 early stopping on GPU 1.
+- Added per-patch class probabilities and a post-run observed-label audit that
+  quantifies center-class fraction, unlabeled fraction, accuracy by purity bin,
+  and cube-by-class performance. Field 2 remains locked and no synthetic sample
+  can enter model fitting.
 
 ## 2026-07-31
 
