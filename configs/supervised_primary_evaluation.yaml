@@ -15,7 +15,7 @@ architectures:
   - spatial_average_cnn
   - center_context_fusion
 primary_architecture: center_context_fusion
-model_seeds: [42, 43, 44]\nsample_selection_seed: 42
+model_seeds: [42, 43, 44]
 
 training:
   samples_per_training_class: 20000
