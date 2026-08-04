@@ -65,6 +65,13 @@ corrections.
   for repeatability. The next supervised gate is a center-aware architecture
   ablation: pixel spectrum, spatial-average CNN, and fused center-plus-context
   models on the same frozen Fold-1 samples.
+- Staged a controlled three-seed center-aware architecture ablation using the
+  identical 60,000 training and 15,000 validation patches. It compares a center-
+  spectrum MLP, the existing spatial-average CNN, and a fused center-plus-context
+  classifier with matched early-stopping rules on GPU 1.
+- The ablation reports parameter count, overall and class F1, seed variability,
+  and mean/worst-cube macro-F1. No automatic winner is declared; review of both
+  central accuracy and spatial robustness is required before five-fold training.
 
 ## 2026-07-31
 
