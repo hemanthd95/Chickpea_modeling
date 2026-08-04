@@ -53,16 +53,21 @@ def balanced_subset(frame: pd.DataFrame, count: int, seed: int) -> pd.DataFrame:
 
 
 @torch.no_grad()
-def evaluate(model: nn.Module, loader: DataLoader, device: torch.device) -> tuple[float, np.ndarray, np.ndarray]:
-    model.eval(); losses = []; targets = []; predictions = []
+def evaluate(
+    model: nn.Module, loader: DataLoader, device: torch.device
+) -> tuple[float, np.ndarray, np.ndarray, np.ndarray]:
+    model.eval(); losses = []; targets = []; predictions = []; probabilities = []
     criterion = nn.CrossEntropyLoss()
     for patches, labels in loader:
         patches, labels = patches.to(device, non_blocking=True), labels.to(device, non_blocking=True)
         logits = model(patches)
         losses.append(float(criterion(logits, labels).item()) * len(labels))
-        targets.append(labels.cpu().numpy()); predictions.append(logits.argmax(1).cpu().numpy())
+        probability = logits.softmax(dim=1)
+        targets.append(labels.cpu().numpy())
+        predictions.append(probability.argmax(1).cpu().numpy())
+        probabilities.append(probability.cpu().numpy())
     truth, predicted = np.concatenate(targets), np.concatenate(predictions)
-    return sum(losses) / len(truth), truth, predicted
+    return sum(losses) / len(truth), truth, predicted, np.concatenate(probabilities)
 
 
 def main() -> None:
@@ -84,7 +89,10 @@ def main() -> None:
     project = Path(paths["project_root"])
     local = project / "metadata" / "local"
     contracts = local / "contracts"
-    reports = local / "reports" / "models" / "supervised_smoke_fold1"
+    report_stage = Path(config.get("report_stage", "models/supervised_smoke_fold1"))
+    if report_stage.is_absolute() or ".." in report_stage.parts:
+        raise ValueError("report_stage must be a safe path relative to metadata/local/reports")
+    reports = local / "reports" / report_stage
     reports.mkdir(parents=True, exist_ok=True)
     output = project / config["output_dir"]
     output.mkdir(parents=True, exist_ok=True)
@@ -161,6 +169,10 @@ def main() -> None:
     best_path = output / "best_model.pt"
     total_epochs = int(training["epochs"])
     log_every = int(training.get("log_every_batches", 10))
+    patience = int(training.get("early_stopping_patience", total_epochs))
+    minimum_epochs = int(training.get("minimum_epochs", 1))
+    minimum_delta = float(training.get("early_stopping_minimum_delta", 0.0))
+    epochs_without_improvement = 0
     print(
         f"Starting diagnostic on {device} ({torch.cuda.get_device_name(device) if device.type == 'cuda' else 'CPU'}) "
         f"with {gpu_count} visible GPU(s): "
@@ -183,7 +195,7 @@ def main() -> None:
                     f"loss={loss_sum / seen:.4f} elapsed={elapsed / 60:.1f} min",
                     flush=True,
                 )
-        validation_loss, truth, predicted = evaluate(model, validation_loader, device)
+        validation_loss, truth, predicted, _ = evaluate(model, validation_loader, device)
         macro_f1 = f1_score(truth, predicted, average="macro")
         row = {
             "epoch": epoch, "training_loss": loss_sum / seen,
@@ -193,15 +205,37 @@ def main() -> None:
             "validation_macro_f1": macro_f1,
         }
         history.append(row); print(row, flush=True)
-        if macro_f1 > best_f1:
+        if macro_f1 > best_f1 + minimum_delta:
             best_f1 = macro_f1
+            epochs_without_improvement = 0
             state = model.module.state_dict() if isinstance(model, nn.DataParallel) else model.state_dict()
             torch.save({"model_state": state, "config": config, "epoch": epoch}, best_path)
+        else:
+            epochs_without_improvement += 1
+        if epoch >= minimum_epochs and epochs_without_improvement >= patience:
+            print(
+                f"Early stopping after epoch {epoch}: no macro-F1 improvement "
+                f"> {minimum_delta:.4f} for {patience} epochs.",
+                flush=True,
+            )
+            break
 
     checkpoint = torch.load(best_path, map_location=device, weights_only=False)
     target_model = model.module if isinstance(model, nn.DataParallel) else model
     target_model.load_state_dict(checkpoint["model_state"])
-    validation_loss, truth, predicted = evaluate(model, validation_loader, device)
+    validation_loss, truth, predicted, probabilities = evaluate(model, validation_loader, device)
+    prediction_frame = validation.copy()
+    prediction_frame["true_class_id"] = truth
+    prediction_frame["predicted_class_id"] = predicted
+    prediction_frame["predicted_class_name"] = np.asarray(
+        ["soil", "chickpea", "weed"], dtype=object
+    )[predicted]
+    prediction_frame["probability_soil"] = probabilities[:, 0]
+    prediction_frame["probability_chickpea"] = probabilities[:, 1]
+    prediction_frame["probability_weed"] = probabilities[:, 2]
+    prediction_frame["prediction_confidence"] = probabilities.max(axis=1)
+    prediction_frame["correct"] = truth == predicted
+    prediction_frame.to_csv(reports / "validation_predictions.csv", index=False)
     history_frame = pd.DataFrame(history)
     history_frame.to_csv(reports / "training_history.csv", index=False)
     report = pd.DataFrame(classification_report(
@@ -224,10 +258,26 @@ def main() -> None:
                 yticklabels=["Soil", "Chickpea", "Weed"], ax=axes[1], vmin=0, vmax=1)
     axes[1].set_xlabel("Predicted"); axes[1].set_ylabel("True")
     axes[1].set_title("Row-normalized Fold-1 diagnostic confusion")
-    figure.suptitle("Supervised spectral-spatial pipeline smoke test", fontsize=14)
+    figure.suptitle(
+        config.get("run_title", "Supervised spectral-spatial pipeline diagnostic"),
+        fontsize=14,
+    )
     preview = reports / "supervised_smoke_overview.png"
     figure.savefig(preview, dpi=200); plt.close(figure)
-    print(f"Best diagnostic macro-F1: {best_f1:.4f}")
+    run_summary = {
+        "status": "diagnostic_only",
+        "heldout_fold": heldout,
+        "best_epoch": int(checkpoint["epoch"]),
+        "best_validation_macro_f1": float(best_f1),
+        "final_evaluated_validation_loss": float(validation_loss),
+        "training_samples": int(len(train)),
+        "validation_samples": int(len(validation)),
+        "device": str(device),
+        "field2_accessed": False,
+        "synthetic_training_samples": False,
+    }
+    (reports / "run_summary.yaml").write_text(yaml.safe_dump(run_summary, sort_keys=False))
+    print(f"Best diagnostic macro-F1: {best_f1:.4f} at epoch {checkpoint['epoch']}")
     print(f"Device: {device}; visible GPUs: {gpu_count}; train={len(train):,}; validation={len(validation):,}")
     print(f"Reports: {reports}"); print(f"Visual QC: {preview}")
     print("Diagnostic only—not a five-fold or exhaustive primary benchmark.")
