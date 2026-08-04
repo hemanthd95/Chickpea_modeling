@@ -63,6 +63,8 @@ augmentation of observed patches is permitted and must be documented.
 - Contrastive SSL using full reflectance.
 - Traditional supervised models for chickpea/weed/soil.
 - Supervised spectral-spatial model with imbalance-aware loss.
+- Center-spectrum, spatial-average, and fused center-context supervised
+  architectures on identical observed samples and spatial folds.
 
 ## Legacy PCA-derivative products
 
@@ -79,6 +81,8 @@ smoothing protocol.
   observations of the same mapped ground area must share one split. Split IDs
   are assigned in map coordinates, not independently by cube.
 - No neighboring-patch overlap across train/test spatial blocks.
+- Architecture selection uses repeated seeds and considers macro-F1, chickpea F1,
+  and worst-cube macro-F1; no single best-seed score may determine selection.
 - No global normalization fitted using validation or Field 2.
 - No cluster-number tuning against Field 2 RTK outcomes.
 - No smoothing before primary spatial-coherence evaluation.
