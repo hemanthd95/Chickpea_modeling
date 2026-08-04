@@ -131,13 +131,24 @@ def main() -> None:
     generator = torch.Generator().manual_seed(seed)
     train_loader = DataLoader(train_dataset, shuffle=True, generator=generator, **loader_kwargs)
     validation_loader = DataLoader(validation_dataset, shuffle=False, **loader_kwargs)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    gpu_count = torch.cuda.device_count()
+    if torch.cuda.is_available():
+        gpu_index = int(training.get("gpu_index", 0))
+        if gpu_index < 0 or gpu_index >= gpu_count:
+            raise ValueError(f"Requested GPU {gpu_index}, but {gpu_count} CUDA devices are visible")
+        torch.cuda.set_device(gpu_index)
+        device = torch.device(f"cuda:{gpu_index}")
+    else:
+        gpu_index = None
+        device = torch.device("cpu")
+    if training.get("use_all_visible_gpus", False):
+        raise ValueError(
+            "The diagnostic prohibits nn.DataParallel after the measured workstation stall; "
+            "use one selected GPU. Full multi-GPU experiments will use DistributedDataParallel."
+        )
     model = SupervisedClassifier(
         in_channels=len(band_indices), embedding_dim=int(config["model"]["embedding_dim"]), classes=3
     ).to(device)
-    gpu_count = torch.cuda.device_count()
-    if device.type == "cuda" and training.get("use_all_visible_gpus", True) and gpu_count > 1:
-        model = nn.DataParallel(model)
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=float(training["learning_rate"]),
         weight_decay=float(training["weight_decay"]),
@@ -151,7 +162,8 @@ def main() -> None:
     total_epochs = int(training["epochs"])
     log_every = int(training.get("log_every_batches", 10))
     print(
-        f"Starting diagnostic on {device} with {gpu_count} visible GPU(s): "
+        f"Starting diagnostic on {device} ({torch.cuda.get_device_name(device) if device.type == 'cuda' else 'CPU'}) "
+        f"with {gpu_count} visible GPU(s): "
         f"train={len(train):,}, validation={len(validation):,}, "
         f"batches/epoch={len(train_loader):,}"
     )
