@@ -588,3 +588,20 @@ corrections.
 - Sample selection uses deterministic seed 42 in the builder without changing the
   already frozen primary-evaluation configuration. Field 2 remains locked.
 
+### Dual-GPU nested checkpoint training staged
+
+- Nested sample freezing passed with 375,000 exact observed role-specific rows.
+  The smallest eligible Fit pool is 90,723 chickpea centres and the smallest
+  Stop pool is 27,604 chickpea centres, comfortably above frozen selections.
+- Extended the validated architecture trainer with a contract-gated nested mode.
+  It reads exact frozen samples and outer+inner-excluded normalization, rejects
+  any outer-fold sample in Fit or Stop roles, and records outer-test access as
+  false.
+- Added a resumable two-GPU scheduler for 45 checkpoint runs. Each outer fold
+  trains the three frozen architectures across seeds 42–44; independent
+  subprocesses own CUDA 0 and CUDA 1, avoiding DataParallel.
+- Checkpoints are selected exclusively by inner-validation macro-F1. Aggregated
+  inner metrics and the PNG are model-selection diagnostics only, never outer
+  performance claims. Completion freezes hashes for all 45 checkpoints before
+  outer-test inference is permitted. Field 2 remains locked.
+
