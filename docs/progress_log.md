@@ -26,6 +26,19 @@ corrections.
   pinned to dedicated GPU 1 with batch 256. The full benchmark will use
   multi-process DistributedDataParallel only after the single-GPU data path is
   validated.
+- The three-epoch Fold-1 smoke test completed successfully on GPU 1. Validation
+  accuracy and balanced accuracy were 0.5192 and macro-F1 was 0.5188 on an
+  exactly balanced 6,000-patch diagnostic set.
+- Per-class F1 was 0.5197 soil, 0.5268 chickpea, and 0.5101 weed. Chickpea had
+  the highest recall (0.5980) but lowest precision (0.4707), reflecting
+  overprediction: 2,541 patches were predicted chickpea versus 2,000 true.
+- The largest directional error was weed-to-chickpea (783/2,000; 39.15%).
+  Soil recall was 0.4520, with soil divided almost evenly between chickpea and
+  weed errors. These results support spectral-spatial ambiguity but do not yet
+  test hidden weed phenotypes.
+- Training and validation losses decreased through epoch 3 (0.9199 and 0.9701),
+  with a small gap and no convergence. The smoke test therefore passes the
+  pipeline gate but is prohibited from serving as the supervised baseline.
 
 ## 2026-07-31
 
