@@ -46,6 +46,25 @@ corrections.
   quantifies center-class fraction, unlabeled fraction, accuracy by purity bin,
   and cube-by-class performance. Field 2 remains locked and no synthetic sample
   can enter model fitting.
+- The convergence diagnostic stopped at epoch 11 and restored epoch 6, where
+  balanced accuracy was 0.6170 and macro-F1 was 0.6138. Training loss continued
+  downward after epoch 6 while validation performance became unstable, confirming
+  spatial overfitting rather than incomplete optimization.
+- Epoch-6 class performance was: soil precision/recall/F1 =
+  0.6617/0.7832/0.7173; chickpea = 0.4860/0.4676/0.4766; weed =
+  0.7026/0.6002/0.6474. Chickpea is now the limiting supervised class.
+- Soil accuracy rose monotonically from 0.6075 in patches with center-class
+  fraction at most 0.25 to 0.9864 above 0.90, confirming a strong neighborhood-
+  mixing effect for soil.
+- Chickpea accuracy was nonmonotonic and highly cube-dependent (0.2676–0.5962).
+  Weed accuracy also varied substantially by cube (0.4629–0.7703); its pooled
+  decrease with purity was confounded by cubes, because high-purity weed was
+  accurate in Cubes 24/32 but poor in Cubes 40/45/54.
+- These findings do not validate hidden weed classes, but they establish a
+  defensible signal of inter-cube weed heterogeneity that the SSL stage must test
+  for repeatability. The next supervised gate is a center-aware architecture
+  ablation: pixel spectrum, spatial-average CNN, and fused center-plus-context
+  models on the same frozen Fold-1 samples.
 
 ## 2026-07-31
 
