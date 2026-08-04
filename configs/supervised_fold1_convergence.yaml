@@ -1,0 +1,23 @@
+diagnostic_only: true
+run_title: Fold-1 supervised convergence diagnostic
+report_stage: models/supervised_convergence_fold1
+seed: 42
+heldout_fold: 1
+samples_per_training_class: 20000
+samples_per_validation_class: 5000
+model:
+  embedding_dim: 128
+training:
+  epochs: 20
+  minimum_epochs: 6
+  early_stopping_patience: 5
+  early_stopping_minimum_delta: 0.001
+  batch_size: 256
+  learning_rate: 0.0003
+  weight_decay: 0.0001
+  num_workers: 8
+  log_every_batches: 50
+  mixed_precision: true
+  use_all_visible_gpus: false
+  gpu_index: 1
+output_dir: results/supervised_convergence_fold1
