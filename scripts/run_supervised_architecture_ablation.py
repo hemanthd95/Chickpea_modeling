@@ -101,8 +101,11 @@ def main() -> None:
     )
     args = parser.parse_args()
     config = yaml.safe_load(args.config.read_text())
-    if not config.get("diagnostic_only", False):
-        raise ValueError("Architecture ablation must remain diagnostic-only")
+    nested_primary = bool(config.get("nested_primary_training", False))
+    if not config.get("diagnostic_only", False) and not nested_primary:
+        raise ValueError(
+            "Run must be either diagnostic-only or frozen nested primary training"
+        )
     paths = yaml.safe_load(args.paths.read_text())
     project = Path(paths["project_root"])
     local = project / "metadata" / "local"
@@ -116,37 +119,90 @@ def main() -> None:
     output.mkdir(parents=True, exist_ok=True)
 
     manifest = local / "authoritative_manifest.csv"
-    centers_path = contracts / "field1_training_candidate_centers.csv"
-    centers_contract_path = contracts / "field1_training_candidate_contract.yaml"
-    normalization_path = contracts / "field1_fold_normalization.csv"
-    normalization_contract_path = contracts / "field1_fold_normalization_contract.yaml"
-    center_contract = yaml.safe_load(centers_contract_path.read_text())
-    normalization_contract = yaml.safe_load(normalization_contract_path.read_text())
-    if sha256(centers_path) != center_contract["center_index_sha256"]:
-        raise ValueError("Candidate-center hash mismatch")
-    if sha256(normalization_path) != normalization_contract["normalization_csv_sha256"]:
-        raise ValueError("Normalization hash mismatch")
-
     heldout = int(config["heldout_fold"])
-    sampling_seed = int(config["seed_for_observed_sample_selection"])
-    centers = pd.read_csv(centers_path)
-    train = balanced_subset(
-        centers[as_bool(centers[f"train_eligible_holdout_{heldout}"])],
-        int(config["samples_per_training_class"]),
-        sampling_seed,
-    )
-    validation = balanced_subset(
-        centers[as_bool(centers[f"validation_eligible_fold_{heldout}"])],
-        int(config["samples_per_validation_class"]),
-        sampling_seed + 1000,
-    )
-    band_indices = load_band_indices(args.bands, normalization_contract["band_section"])
-    statistics = pd.read_csv(normalization_path)
-    statistics = (
-        statistics[statistics["heldout_fold"] == heldout]
-        .set_index("band_index")
-        .loc[band_indices]
-    )
+    if nested_primary:
+        centers_path = contracts / config["nested_sample_file"]
+        centers_contract_path = contracts / config["nested_sample_contract"]
+        normalization_path = contracts / config["nested_normalization_file"]
+        normalization_contract_path = (
+            contracts / config["nested_normalization_contract"]
+        )
+        center_contract = yaml.safe_load(centers_contract_path.read_text())
+        normalization_contract = yaml.safe_load(
+            normalization_contract_path.read_text()
+        )
+        if center_contract.get("status") != "frozen_nested_model_samples":
+            raise ValueError("Nested model-sample contract is not frozen")
+        if sha256(centers_path) != center_contract["sample_csv_sha256"]:
+            raise ValueError("Nested model-sample hash mismatch")
+        if (
+            normalization_contract.get("status")
+            != "frozen_nested_training_only_normalization"
+        ):
+            raise ValueError("Nested normalization contract is not frozen")
+        if (
+            sha256(normalization_path)
+            != normalization_contract["normalization_csv_sha256"]
+        ):
+            raise ValueError("Nested normalization hash mismatch")
+        centers = pd.read_csv(centers_path)
+        selected = centers[centers["outer_fold"] == heldout]
+        train = selected[selected["nested_role"] == "train"].reset_index(drop=True)
+        validation = selected[
+            selected["nested_role"] == "inner_validation"
+        ].reset_index(drop=True)
+        if set(train["fold"].unique()) & set(validation["fold"].unique()):
+            raise ValueError("Nested fitting and inner-validation folds overlap")
+        if heldout in set(train["fold"]) | set(validation["fold"]):
+            raise ValueError("Outer-test fold appears in nested model samples")
+        band_indices = load_band_indices(
+            args.bands, normalization_contract["band_section"]
+        )
+        statistics = pd.read_csv(normalization_path)
+        statistics = (
+            statistics[statistics["outer_fold"] == heldout]
+            .set_index("band_index")
+            .loc[band_indices]
+        )
+    else:
+        centers_path = contracts / "field1_training_candidate_centers.csv"
+        centers_contract_path = contracts / "field1_training_candidate_contract.yaml"
+        normalization_path = contracts / "field1_fold_normalization.csv"
+        normalization_contract_path = (
+            contracts / "field1_fold_normalization_contract.yaml"
+        )
+        center_contract = yaml.safe_load(centers_contract_path.read_text())
+        normalization_contract = yaml.safe_load(
+            normalization_contract_path.read_text()
+        )
+        if sha256(centers_path) != center_contract["center_index_sha256"]:
+            raise ValueError("Candidate-center hash mismatch")
+        if (
+            sha256(normalization_path)
+            != normalization_contract["normalization_csv_sha256"]
+        ):
+            raise ValueError("Normalization hash mismatch")
+        sampling_seed = int(config["seed_for_observed_sample_selection"])
+        centers = pd.read_csv(centers_path)
+        train = balanced_subset(
+            centers[as_bool(centers[f"train_eligible_holdout_{heldout}"])],
+            int(config["samples_per_training_class"]),
+            sampling_seed,
+        )
+        validation = balanced_subset(
+            centers[as_bool(centers[f"validation_eligible_fold_{heldout}"])],
+            int(config["samples_per_validation_class"]),
+            sampling_seed + 1000,
+        )
+        band_indices = load_band_indices(
+            args.bands, normalization_contract["band_section"]
+        )
+        statistics = pd.read_csv(normalization_path)
+        statistics = (
+            statistics[statistics["heldout_fold"] == heldout]
+            .set_index("band_index")
+            .loc[band_indices]
+        )
     records = load_records(args.paths, manifest)
     train_dataset = IndexedPatchDataset(
         records, train, band_indices, statistics["mean"].to_numpy(),
@@ -445,7 +501,11 @@ def main() -> None:
     )
     aggregate.to_csv(reports / "architecture_ablation_aggregate.csv", index=False)
     contract = {
-        "status": "diagnostic_architecture_ablation_complete",
+        "status": (
+            "nested_primary_training_complete"
+            if nested_primary
+            else "diagnostic_architecture_ablation_complete"
+        ),
         "field": "Field 1",
         "heldout_fold": heldout,
         "field2_accessed": False,
@@ -457,7 +517,12 @@ def main() -> None:
         "candidate_center_sha256": sha256(centers_path),
         "normalization_sha256": sha256(normalization_path),
         "configuration_sha256": sha256(args.config),
-        "selection_status": "no_architecture_selected_automatically",
+        "selection_status": (
+            "architectures_pre_frozen_outer_test_unopened"
+            if nested_primary
+            else "no_architecture_selected_automatically"
+        ),
+        "outer_test_accessed": False if nested_primary else None,
     }
     (reports / "architecture_ablation_contract.yaml").write_text(
         yaml.safe_dump(contract, sort_keys=False)
@@ -465,11 +530,18 @@ def main() -> None:
     print(aggregate.to_string(index=False), flush=True)
     print(f"Reports: {reports}", flush=True)
     print(f"Visual QC: {preview}", flush=True)
-    print(
-        "Diagnostic only; Field 2 was not accessed and no architecture was "
-        "automatically selected.",
-        flush=True,
-    )
+    if nested_primary:
+        print(
+            "Nested training complete; checkpoints used inner validation only. "
+            "Outer-test labels and Field 2 were not accessed.",
+            flush=True,
+        )
+    else:
+        print(
+            "Diagnostic only; Field 2 was not accessed and no architecture was "
+            "automatically selected.",
+            flush=True,
+        )
 
 
 if __name__ == "__main__":
