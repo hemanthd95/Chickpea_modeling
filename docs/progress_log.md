@@ -498,3 +498,17 @@ corrections.
 - The contract explicitly prohibits architecture switching after the five-fold
   benchmark. Fold 1 remains development-only; Field 2 remains unopened.
 
+### Resumable dual-GPU five-fold supervised benchmark staged
+
+- Added a contract-gated five-fold benchmark over the three frozen architectures
+  and seeds 42, 43, and 44, yielding 45 planned Fold 1–5 runs.
+- The scheduler launches independent single-GPU subprocesses on CUDA devices 0
+  and 1. It never uses DataParallel; at most one fold owns each GPU.
+- Completed folds are validated from their nine architecture/seed summaries and
+  skipped on restart. Fold-specific reports and checkpoints remain isolated.
+- The aggregate stage produces run-, fold-, class-, and cube-level CSVs, a
+  three-panel PNG, and a hashed local benchmark contract.
+- This benchmark uses balanced observed validation subsets to measure stability.
+  It is explicitly not the later exhaustive held-out-mask evaluation and does
+  not access Field 2.
+
