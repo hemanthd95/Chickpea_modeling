@@ -622,3 +622,17 @@ corrections.
   three-class cube macro-F1, quantifies the eventual inference volume, and emits
   class-support and cube-completeness visual QC. Field 2 remains locked.
 
+
+### Corrected outer support accounting and GPU inference pilot staged
+
+- Corrected the cube-fold completeness report so 46 combinations with zero eligible
+  observations are classified as noncontributing rather than invalid. The exhaustive
+  support now contains 49 contributing cube-fold records: 36 contain all three
+  classes and 13 contain two classes. The scientific support total remains unchanged
+  at 12,782,603 eligible observed Field 1 predictions.
+- Added a contract-gated real-data GPU inference engineering pilot. It loads the
+  frozen three-seed center-context ensemble, gathers 15×15×111 observed patches on
+  one GPU without random ENVI reads, and benchmarks batch sizes 256, 512, and 1024.
+- The pilot computes no target metric and cannot become a reported performance
+  result. It writes throughput and peak-VRAM CSVs, a PNG, and a frozen selected-batch
+  contract before exhaustive inference is implemented. Field 2 remains locked.
