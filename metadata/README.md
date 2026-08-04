@@ -27,6 +27,9 @@ Current report stages:
 - `models/supervised_convergence_fold1/`: larger Fold-1 convergence diagnostic,
   per-patch probabilities, early-stopping history, and observed patch-purity error
   analysis. This stage remains diagnostic and cannot replace five-fold results.
+- `models/supervised_architecture_ablation_fold1/`: controlled three-seed
+  comparison of center-spectrum, spatial-average, and fused center-context
+  classifiers, including class and worst-cube metrics plus visual QC.
 
 Accepted local analytical contracts are written to `metadata/local/contracts/`.
 Each contract includes hashes and the visual artifact reviewed by the investigator.
