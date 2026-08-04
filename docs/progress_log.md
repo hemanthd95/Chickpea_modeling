@@ -572,3 +572,19 @@ corrections.
 - Existing outer-only normalization remains valid for development diagnostics but
   is prohibited for the nested primary evaluation. Field 2 remains locked.
 
+### Nested fitting and inner-validation sample freeze staged
+
+- Added a deterministic selector over the existing 684,521 fully observed,
+  authoritative Field 1 candidate centres. For each outer evaluation it requires
+  simultaneous safety from both outer and inner boundaries.
+- Exact model-selection samples are frozen at 20,000 fitting and 5,000 inner
+  validation centres per class per outer fold, totaling 375,000 role-specific
+  rows. Training uses only the three Fit folds; Stop samples come only from the
+  declared inner fold; outer Test labels are absent.
+- The stage records eligible pool sizes and cube coverage before sampling,
+  verifies normalization and protocol hashes, and emits a class/fold availability
+  PNG. These balanced samples support fitting and early stopping only; exhaustive
+  outer evaluation retains observed prevalence.
+- Sample selection uses deterministic seed 42 in the builder without changing the
+  already frozen primary-evaluation configuration. Field 2 remains locked.
+
