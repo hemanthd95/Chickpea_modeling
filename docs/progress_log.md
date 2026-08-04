@@ -605,3 +605,20 @@ corrections.
   performance claims. Completion freezes hashes for all 45 checkpoints before
   outer-test inference is permitted. Field 2 remains locked.
 
+### Nested checkpoints passed and outer-test support audit staged
+
+- Frozen all 45 nested checkpoints after inner-validation-only early stopping.
+  Center-context fusion led spatial-average CNN on every Stop-fold pairing by
+  0.024293–0.041830 macro-F1. Across nested diagnostics, fusion mean macro-F1 was
+  0.686752, with soil/chickpea/weed F1 of 0.783548/0.514095/0.762613.
+- These values remain checkpoint-selection diagnostics, not test results.
+  Selected epochs vary substantially by outer role; fusion averages 4.87 epochs
+  and ranges from 1 to 11, supporting fold-specific early stopping.
+- Added a post-checkpoint exhaustive support audit that is the first permitted
+  opening of Field 1 outer-test labels. It counts all patch-safe, fully observed,
+  boundary-safe labeled observations by fold, cube, class, and 5 m group without
+  generating predictions.
+- The audit explicitly marks cube-fold records missing any class as invalid for
+  three-class cube macro-F1, quantifies the eventual inference volume, and emits
+  class-support and cube-completeness visual QC. Field 2 remains locked.
+
