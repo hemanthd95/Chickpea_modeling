@@ -18,6 +18,14 @@ corrections.
   5000 Ada devices under deterministic and cuDNN-autotuned execution before
   changing the scientific training pipeline. Benchmark tensors are engineering
   inputs only and can never enter fitted models or reported scientific results.
+- Both GPUs passed independently. At deterministic batch 256, GPU 0 processed
+  134,976 and GPU 1 processed 176,473 engineering samples/s; peak allocated
+  memory was only 0.106 GiB. Deterministic execution imposed no meaningful
+  throughput penalty.
+- Isolated `nn.DataParallel` as the failed execution path. The smoke test is now
+  pinned to dedicated GPU 1 with batch 256. The full benchmark will use
+  multi-process DistributedDataParallel only after the single-GPU data path is
+  validated.
 
 ## 2026-07-31
 
