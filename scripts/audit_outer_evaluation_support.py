@@ -298,6 +298,9 @@ def main() -> None:
     cube_presence["classes_present"] = (
         cube_presence[CLASS_ORDER].sum(axis=1).astype(int)
     )
+    cube_presence["contributes_any_outer_test_observation"] = (
+        cube_presence["classes_present"] > 0
+    )
     cube_presence["valid_three_class_cube_macro_f1"] = (
         cube_presence["classes_present"] == 3
     )
@@ -322,10 +325,13 @@ def main() -> None:
     axes[0].set_title("Exhaustive outer-test class support")
     axes[0].tick_params(axis="x", rotation=0)
 
+    contributing_presence = cube_presence[
+        cube_presence["contributes_any_outer_test_observation"]
+    ]
     presence_counts = (
-        cube_presence.groupby(["outer_fold", "classes_present"]).size().unstack(
-            fill_value=0
-        )
+        contributing_presence.groupby(["outer_fold", "classes_present"])
+        .size()
+        .unstack(fill_value=0)
     )
     for value in (1, 2, 3):
         if value not in presence_counts:
@@ -373,11 +379,21 @@ def main() -> None:
         "total_eligible_outer_test_observations": int(
             summary["eligible_outer_test_centers"].sum()
         ),
+        "total_cube_fold_combinations": int(len(cube_presence)),
+        "noncontributing_cube_fold_combinations": int(
+            (~cube_presence["contributes_any_outer_test_observation"]).sum()
+        ),
+        "contributing_cube_fold_records": int(
+            cube_presence["contributes_any_outer_test_observation"].sum()
+        ),
         "valid_three_class_cube_fold_records": int(
             cube_presence["valid_three_class_cube_macro_f1"].sum()
         ),
-        "invalid_cube_fold_records_for_three_class_macro_f1": int(
-            (~cube_presence["valid_three_class_cube_macro_f1"]).sum()
+        "incomplete_contributing_cube_fold_records": int(
+            (
+                cube_presence["contributes_any_outer_test_observation"]
+                & ~cube_presence["valid_three_class_cube_macro_f1"]
+            ).sum()
         ),
         "output_hashes": output_hashes,
         "source_hashes": {
@@ -401,9 +417,12 @@ def main() -> None:
     print(summary.to_string(index=False))
     print(f"Total eligible observations: {contract['total_eligible_outer_test_observations']:,}")
     print(
-        "Valid three-class cube-fold records: "
-        f"{contract['valid_three_class_cube_fold_records']}; invalid: "
-        f"{contract['invalid_cube_fold_records_for_three_class_macro_f1']}"
+        "Contributing cube-fold records: "
+        f"{contract['contributing_cube_fold_records']}; all three classes: "
+        f"{contract['valid_three_class_cube_fold_records']}; incomplete: "
+        f"{contract['incomplete_contributing_cube_fold_records']}; "
+        "noncontributing combinations: "
+        f"{contract['noncontributing_cube_fold_combinations']}"
     )
     print(f"Contract: {contract_path}")
     print(f"Visual QC: {preview}")
