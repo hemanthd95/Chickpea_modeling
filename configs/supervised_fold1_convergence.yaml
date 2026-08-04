@@ -1,6 +1,7 @@
 diagnostic_only: true
 run_title: Fold-1 supervised convergence diagnostic
 report_stage: models/supervised_convergence_fold1
+overview_filename: supervised_convergence_overview.png
 seed: 42
 heldout_fold: 1
 samples_per_training_class: 20000
