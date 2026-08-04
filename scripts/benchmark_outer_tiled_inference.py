@@ -182,10 +182,19 @@ def main() -> None:
     radius = int(protocol_config["training"]["patch_size_pixels"]) // 2
 
     observed = np.any(cube.array > 0, axis=2)
-    valid = observed.copy()
+    valid = np.ones(observed.shape, dtype=bool)
     valid[:radius] = False; valid[-radius:] = False
     valid[:, :radius] = False; valid[:, -radius:] = False
     rows, columns = np.nonzero(valid)
+    invalid = (~observed).astype(np.int32)
+    integral = np.pad(invalid.cumsum(0).cumsum(1), ((1, 0), (1, 0)))
+    row_min, row_max = rows - radius, rows + radius + 1
+    col_min, col_max = columns - radius, columns + radius + 1
+    invalid_count = (
+        integral[row_max, col_max] - integral[row_min, col_max]
+        - integral[row_max, col_min] + integral[row_min, col_min]
+    )
+    rows, columns = rows[invalid_count == 0], columns[invalid_count == 0]
     maximum = int(config["pilot"]["maximum_observed_centers"])
     if len(rows) > maximum:
         indices = np.linspace(0, len(rows) - 1, maximum, dtype=np.int64)
