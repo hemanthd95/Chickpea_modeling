@@ -24,6 +24,9 @@ Current report stages:
 - `models/supervised_smoke_fold1/`: bounded diagnostic learning curves,
   classification report, and confusion matrix. These are pipeline checks, not
   primary five-fold results.
+- `models/supervised_convergence_fold1/`: larger Fold-1 convergence diagnostic,
+  per-patch probabilities, early-stopping history, and observed patch-purity error
+  analysis. This stage remains diagnostic and cannot replace five-fold results.
 
 Accepted local analytical contracts are written to `metadata/local/contracts/`.
 Each contract includes hashes and the visual artifact reviewed by the investigator.
