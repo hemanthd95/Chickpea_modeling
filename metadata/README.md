@@ -44,3 +44,8 @@ may be deleted and regenerated from the documented scripts.
 - `contracts/field1_supervised_architecture_contract.yaml`: hashed Fold-1
   architecture decision freezing center-context fusion as primary and retaining
   spatial-average and center-spectrum supervised baselines before five-fold work.
+
+- `models/supervised_fivefold_balanced/`: resumable 45-run, five-fold ×
+  three-architecture × three-seed balanced supervised benchmark, with isolated
+  fold outputs, an aggregate PNG, and a hashed completion contract. It measures
+  development stability and is not exhaustive held-out-mask evaluation.
