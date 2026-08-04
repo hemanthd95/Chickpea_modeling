@@ -481,3 +481,20 @@ corrections.
   to Field 2, then reveal RTK tall-grass coordinates.
 - Five weed groups are a biological prior, not a forced clustering result.
 - Cluster outputs are candidate weed phenotypes until botanically validated.
+
+### Supervised architecture decision frozen
+
+- Completed the controlled Fold-1 three-seed architecture ablation on identical
+  observed samples. Center-context fusion achieved mean macro-F1 0.643905
+  (SD 0.005936), exceeding spatial-average CNN by 0.029469 absolute (4.80%
+  relative) and winning the paired comparison for seeds 42, 43, and 44.
+- Spatial-average CNN retained the strongest mean chickpea F1 (0.474566), while
+  center-spectrum MLP retained the strongest mean worst-cube macro-F1 (0.536734).
+  The three models therefore serve distinct primary, spatial-context baseline,
+  and spectral-only baseline roles rather than being reduced to a single result.
+- Added a deterministic contract freezer that verifies all nine
+  architecture/seed runs, class metrics, cube metrics, source hashes, and reviewed
+  PNG before recording the primary architecture and both baselines.
+- The contract explicitly prohibits architecture switching after the five-fold
+  benchmark. Fold 1 remains development-only; Field 2 remains unopened.
+
