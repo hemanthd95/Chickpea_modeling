@@ -50,3 +50,22 @@ offset, merges duplicate detections along the same physical row, and requires at
 least 1.5 m of longitudinal span and 1.5 m total line support before extending a
 row centerline. Reports now include accepted row-cluster count and median spacing.
 The ineffective candidate set is rejected and cannot become authoritative.
+
+## Agronomic row spacing supplied and fixed-lattice review staged
+
+The investigator supplied the planter spacing: exactly 3 ft (0.9144 m) between
+rows. The free-spacing Hough clusters are therefore superseded. Hough is now used
+only to estimate image-space orientation, while a 0.9144 m lattice is fitted by
+phase to the observed mask. This prevents dense weed bands from inventing extra
+rows at 0.24–0.40 m spacing.
+
+A conservative local-orientation diagnostic compares 0.60 m support along and
+across the row direction. This is designed to reject transverse structures such
+as the known weed band in Cube 47 even where they cross a valid lattice corridor.
+
+For alley review, the verified numbered plots form an experimental convex-hull
+envelope. Within that envelope, current chickpea pixels outside plot polygons
+buffered by 0.15 m are marked as alley candidates; pixels outside the envelope
+are unaffected because the plot layer is incomplete across Field 1. Row,
+orientation, and alley removals remain separately reported and visualized. No
+authoritative label is changed at this stage.
