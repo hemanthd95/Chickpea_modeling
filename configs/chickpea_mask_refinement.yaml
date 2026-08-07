@@ -1,0 +1,24 @@
+status: investigator_review_candidates
+field: Field 1
+source_class: authoritative_chickpea
+reassignment_if_accepted: weed
+
+# These values are fixed before candidate masks are inspected. No value is
+# automatically selected from the resulting retention rates.
+plot_buffer_candidates_m: [0.00, 0.15]
+row_corridor_half_width_candidates_m: [0.06, 0.10, 0.15]
+
+row_detection:
+  hough_threshold: 40
+  minimum_line_length_m: 0.60
+  maximum_line_gap_m: 0.30
+  orientation_bin_degrees: 2.0
+  orientation_tolerance_degrees: 8.0
+  minimum_inlier_lines: 3
+
+review:
+  write_candidate_geotiffs: true
+  automatically_replace_authoritative_masks: false
+  automatically_retrain_models: false
+  field2_locked: true
+  raw_masks_are_immutable: true
