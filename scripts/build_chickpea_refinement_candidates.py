@@ -17,7 +17,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import cv2
+try:
+    import cv2
+except ModuleNotFoundError as error:
+    raise SystemExit(
+        "OpenCV is required for the declared Hough-row refinement. Install it in "
+        "the active environment with: conda install -c conda-forge opencv"
+    ) from error
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 import numpy as np
