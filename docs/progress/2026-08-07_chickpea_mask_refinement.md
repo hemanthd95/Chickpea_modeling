@@ -195,3 +195,9 @@ The first standardized reflectance-PCA run stopped on cube 20 because the provis
 ## Annotation save-safety correction
 
 The planter-track annotator now keeps save status visible in the sticky toolbar, prints successful save counts and paths in the serving terminal, and automatically finishes a valid in-progress polyline before saving or switching views. A browser-side `Download backup JSON` action preserves the current in-memory annotations even when the localhost POST fails. A one-point unfinished feature blocks the action with an explicit correction message rather than being silently omitted.
+
+## Investigator annotation receipt and geometry interpretation
+
+The investigator completed all 16 browser-review cubes and supplied the three synchronized exports: 128 annotations with 1,000 vertices. They comprise 102 tyre-track footprints, 25 alley footprints, and one uncertain structure. JSON, vertex CSV, and EPSG:32617 GeoJSON IDs and coordinates reconcile exactly, and no traced footprint self-intersects. Although the UI called the objects lines, the traces are nearly closed outlines: median mapped footprint widths are approximately 0.39 m for tyre tracks and 1.90 m for alleys. They must therefore be polygonized as investigator-drawn regions rather than buffered as centrelines.
+
+A non-destructive annotation QC stage was added. It rasterizes the footprints on each original cube grid and reports how many current chickpea pixels fall inside alley or tyre footprints. Alley intersections are proposed weed-relabel candidates for investigator review; tyre footprints remain planter-geometry evidence and do not trigger automatic relabeling. Cubes 24 and 28 remain documented phenology sensitivity cases. The stage writes only reports, PNGs, and a provenance contract—never a replacement mask.
