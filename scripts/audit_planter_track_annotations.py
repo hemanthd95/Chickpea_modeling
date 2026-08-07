@@ -52,19 +52,31 @@ def metres_per_pixel(transform) -> float:
     return float(math.sqrt(x * y))
 
 
-def polygon_geometry(coordinates: list[list[float]]) -> dict[str, object]:
+def closed_ring(
+    coordinates: list[list[float]], snap_distance_m: float = 0.75
+) -> tuple[list[tuple[float, float]], bool]:
     if len(coordinates) < 3:
         raise ValueError("A footprint needs at least three vertices")
     ring = [(float(x), float(y)) for x, y in coordinates]
-    if ring[0] != ring[-1]:
+    snapped = False
+    if ring[0] != ring[-1] and math.dist(ring[0], ring[-1]) <= snap_distance_m:
+        # Browser traces normally return to the starting end of the footprint.
+        # Replacing the final near-duplicate with the first point prevents a
+        # centimetre-scale seam crossover without moving any other vertex.
+        ring[-1] = ring[0]
+        snapped = True
+    elif ring[0] != ring[-1]:
         ring.append(ring[0])
+    return ring, snapped
+
+
+def polygon_geometry(coordinates: list[list[float]]) -> dict[str, object]:
+    ring, _ = closed_ring(coordinates)
     return {"type": "Polygon", "coordinates": [ring]}
 
 
 def polygon_area(coordinates: list[list[float]]) -> float:
-    ring = [(float(x), float(y)) for x, y in coordinates]
-    if ring[0] != ring[-1]:
-        ring.append(ring[0])
+    ring, _ = closed_ring(coordinates)
     return abs(sum(
         ring[index][0] * ring[index + 1][1]
         - ring[index + 1][0] * ring[index][1]
@@ -83,9 +95,7 @@ def segment_intersects(a, b, c, d) -> bool:
 
 
 def self_intersections(coordinates: list[list[float]]) -> int:
-    ring = [(float(x), float(y)) for x, y in coordinates]
-    if ring[0] != ring[-1]:
-        ring.append(ring[0])
+    ring, _ = closed_ring(coordinates)
     count = 0
     segment_count = len(ring) - 1
     for first in range(segment_count):
@@ -175,6 +185,7 @@ def main() -> None:
         feature["polygon"] = polygon_geometry(coordinates)
         features_by_cube[str(properties["cube_id"])].append(feature)
         closure_m = math.dist(coordinates[0], coordinates[-1])
+        _, closure_snapped = closed_ring(coordinates)
         geometry_rows.append({
             "cube_id": properties["cube_id"],
             "annotation_id": properties["annotation_id"],
@@ -182,6 +193,7 @@ def main() -> None:
             "layer": properties.get("layer", ""),
             "vertices": len(coordinates),
             "closure_distance_m": closure_m,
+            "closure_endpoint_snapped_for_audit": closure_snapped,
             "polygon_area_m2": polygon_area(coordinates),
             "self_intersections": intersections,
         })
