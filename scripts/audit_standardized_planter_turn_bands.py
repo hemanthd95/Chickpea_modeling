@@ -227,8 +227,10 @@ def main() -> None:
     local = project / "metadata" / "local"
     report_root = local / "reports" / "standardized_planter_turn_audit"
     details = report_root / "cube_previews"
+    layers_root = report_root / "annotation_layers"
     contracts = local / "contracts"
     details.mkdir(parents=True, exist_ok=True)
+    layers_root.mkdir(parents=True, exist_ok=True)
     contracts.mkdir(parents=True, exist_ok=True)
 
     excluded = set(config["investigator_guidance"]["phenology_exclusions_from_refined_primary_supervised_analysis"])
@@ -238,6 +240,7 @@ def main() -> None:
     )
     inventory_rows = []
     candidate_rows = []
+    layer_rows = []
     overview_tiles = []
     input_hashes = []
     max_preview = int(settings["maximum_preview_dimension_pixels"])
@@ -264,6 +267,32 @@ def main() -> None:
         )
         rgb = pca_rgb(scores, valid)
         first, second, structure = spatial_derivatives(scores, valid)
+        cube_layers = layers_root / record.cube_id
+        cube_layers.mkdir(parents=True, exist_ok=True)
+        layer_paths = {
+            "pca": cube_layers / "pca_rgb.png",
+            "first_difference": cube_layers / "first_difference_magnitude.png",
+            "second_difference": cube_layers / "second_difference_magnitude.png",
+        }
+        plt.imsave(layer_paths["pca"], rgb)
+        plt.imsave(layer_paths["first_difference"], first, cmap="gray", vmin=0, vmax=1)
+        plt.imsave(layer_paths["second_difference"], second, cmap="gray", vmin=0, vmax=1)
+        layer_rows.append({
+            "cube_id": record.cube_id,
+            "preview_height": scores.shape[0],
+            "preview_width": scores.shape[1],
+            "preview_step": step,
+            "original_height": height,
+            "original_width": width,
+            "transform_a": transform.a,
+            "transform_b": transform.b,
+            "transform_c": transform.c,
+            "transform_d": transform.d,
+            "transform_e": transform.e,
+            "transform_f": transform.f,
+            "crs": crs,
+            **{f"{name}_path": str(path) for name, path in layer_paths.items()},
+        })
         matrix, inverse = rotation_matrices(structure.shape, angle)
         rotated_structure = rotate(structure, matrix, cv2.INTER_LINEAR)
         rotated_valid = rotate(valid.astype(np.uint8), matrix, cv2.INTER_NEAREST) > 0
@@ -365,10 +394,13 @@ def main() -> None:
 
     inventory = pd.DataFrame(inventory_rows)
     candidate_frame = pd.DataFrame(candidate_rows)
+    layer_frame = pd.DataFrame(layer_rows)
     inventory_path = report_root / "standardized_planter_turn_inventory.csv"
     candidate_path = report_root / "standardized_planter_turn_candidates.csv"
     inventory.to_csv(inventory_path, index=False)
     candidate_frame.to_csv(candidate_path, index=False)
+    layer_manifest_path = report_root / "annotation_layer_manifest.csv"
+    layer_frame.to_csv(layer_manifest_path, index=False)
 
     columns = 4
     rows = math.ceil(len(overview_tiles) / columns)
@@ -395,6 +427,7 @@ def main() -> None:
         "standardized_processing": "per_cube_standardized_pca_plus_spatial_derivatives",
         "review_ready_cubes": len(inventory),
         "candidate_bands": len(candidate_frame),
+        "annotation_layers": len(layer_frame),
         "phenology_sensitivity_only": sorted(excluded),
         "authoritative_masks_modified": False,
         "models_retrained": False,
@@ -407,6 +440,7 @@ def main() -> None:
     print(f"Transverse candidate bands: {len(candidate_frame)}")
     print(f"Reports: {report_root}")
     print(f"Visual QC: {overview_path}")
+    print(f"Annotation layers: {layer_manifest_path}")
     print(f"Contract: {contract_path}")
     print("Audit only: no mask changed, no model retrained, and Field 2 remained locked.")
 
