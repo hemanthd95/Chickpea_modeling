@@ -93,3 +93,6 @@ may be deleted and regenerated from the documented scripts.
   candidates. Geometry evidence is not a class label.
 - `local/contracts/field1_planter_geometry_evidence_contract.yaml`: hashes and
   guardrails for the planter-geometry review.
+
+- `local/reports/standardized_planter_turn_audit/`: consistent reflectance-PCA transverse-band evidence, per-cube profiles, and candidate tables. This replaces the overly permissive generic nonparallel-line candidates for decision making.
+- `local/contracts/field1_standardized_planter_turn_audit_contract.yaml`: immutable audit record for the standardized turn-band review; no masks or models are changed.
