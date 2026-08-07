@@ -191,3 +191,7 @@ A localhost-only browser annotator was added so the investigator can trace visib
 ## Standardized PCA validity correction
 
 The first standardized reflectance-PCA run stopped on cube 20 because the provisional audit rejected a spatial spectrum whenever any individual band equaled 65535. Existing project QC had already established the correct NoData rule as `any spectral band > 0`; valid Pika-L observations can contain 65535 in individual bands. The audit now follows the frozen project rule, records finite/observed/valid preview counts per cube, and reports those counts in any future failure message. No output from the failed run was accepted.
+
+## Annotation save-safety correction
+
+The planter-track annotator now keeps save status visible in the sticky toolbar, prints successful save counts and paths in the serving terminal, and automatically finishes a valid in-progress polyline before saving or switching views. A browser-side `Download backup JSON` action preserves the current in-memory annotations even when the localhost POST fails. A one-point unfinished feature blocks the action with an explicit correction message rather than being silently omitted.
