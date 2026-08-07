@@ -77,7 +77,7 @@ def detect_row_lines(
         maxLineGap=max(1, round(float(settings["maximum_line_gap_m"]) / gsd)),
     )
     if lines is None:
-        raise ValueError("Hough transform found no candidate row lines")
+        return np.zeros(mask.shape, dtype=bool), float("nan"), 0, 0, float("nan")
     # OpenCV packages HoughLinesP output as either (N, 1, 4) or (N, 4),
     # depending on the build. Normalize both representations explicitly.
     line_array = np.asarray(lines)
@@ -95,9 +95,7 @@ def detect_row_lines(
     tolerance = float(settings["orientation_tolerance_degrees"])
     inliers = circular_distance_degrees(angles, dominant) <= tolerance
     if int(inliers.sum()) < int(settings["minimum_inlier_lines"]):
-        raise ValueError(
-            f"Only {int(inliers.sum())} Hough lines support dominant orientation {dominant:.1f} degrees"
-        )
+        return np.zeros(mask.shape, dtype=bool), dominant, int(inliers.sum()), 0, float("nan")
 
     # Merge duplicate Hough detections belonging to the same physical row using
     # their perpendicular offset. Only long, well-supported clusters may create
@@ -142,9 +140,7 @@ def detect_row_lines(
         ):
             accepted.append((center, span_m, total_length_m, len(cluster)))
     if not accepted:
-        raise ValueError(
-            "No dominant-orientation Hough cluster met the declared longitudinal support thresholds"
-        )
+        return np.zeros(mask.shape, dtype=bool), dominant, int(inliers.sum()), 0, float("nan")
 
     canvas = np.zeros(mask.shape, dtype=np.uint8)
     if settings.get("extend_inlier_lines_across_raster", False):
@@ -245,6 +241,7 @@ def main() -> None:
         line_seed, angle, inlier_lines, accepted_rows, median_spacing_m = detect_row_lines(
             original, gsd, config["row_detection"]
         )
+        row_status = "supported_clusters" if accepted_rows else "no_supported_row_cluster_manual_review"
 
         plot_masks = {
             buffer_m: plot_support(plot_geometries, shape, transform, buffer_m, gsd)
@@ -268,6 +265,7 @@ def main() -> None:
             summary_rows.append({
                 "cube_id": record.cube_id,
                 "candidate_type": "row_only",
+                "row_status": row_status,
                 "plot_status": plot_status,
                 "plot_buffer_m": np.nan,
                 "row_corridor_half_width_m": corridor_m,
@@ -295,6 +293,7 @@ def main() -> None:
                 summary_rows.append({
                     "cube_id": record.cube_id,
                     "candidate_type": "plot_and_row_review_only",
+                    "row_status": row_status,
                     "plot_status": plot_status,
                     "plot_buffer_m": buffer_m,
                     "row_corridor_half_width_m": corridor_m,
@@ -353,7 +352,7 @@ def main() -> None:
         plt.close(figure)
         output_paths.append(comparison_path)
         print(
-            f"Prepared {number}/{len(records)} {record.cube_id}: angle={angle:.1f}°, "
+            f"Prepared {number}/{len(records)} {record.cube_id}: {row_status}, angle={angle:.1f}°, "
             f"rows={accepted_rows}, spacing={median_spacing_m:.2f} m, "
             f"row retention={review_candidate.sum() / original.sum():.1%}, "
             f"plot overlap={plot_overlap_fraction:.1%}",
