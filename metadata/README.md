@@ -96,3 +96,5 @@ may be deleted and regenerated from the documented scripts.
 
 - `local/reports/standardized_planter_turn_audit/`: consistent reflectance-PCA transverse-band evidence, per-cube profiles, and candidate tables. This replaces the overly permissive generic nonparallel-line candidates for decision making.
 - `local/contracts/field1_standardized_planter_turn_audit_contract.yaml`: immutable audit record for the standardized turn-band review; no masks or models are changed.
+
+- `local/annotations/planter_tracks/`: investigator-drawn tyre tracks, alley boundaries, and uncertain structures. The browser annotator saves JSON, vertex-level CSV, and GeoJSON; these are review evidence and never automatic class labels.
