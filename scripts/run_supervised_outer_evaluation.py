@@ -396,7 +396,10 @@ def aggregate(args: argparse.Namespace) -> None:
     axes[1, 0].set_xticks(x, [DISPLAY_NAMES[a] for a in architectures], rotation=15, ha="right")
     axes[1, 0].set_ylim(0, 1); axes[1, 0].set_ylabel("Equal-group F1"); axes[1, 0].set_title("Primary class performance"); axes[1, 0].legend()
     complete = cubes[cubes.valid_three_class_macro_f1]
-    axes[1, 1].boxplot([complete.loc[complete.architecture == a, "macro_f1"] for a in architectures], labels=[DISPLAY_NAMES[a] for a in architectures])
+    axes[1, 1].boxplot(
+        [complete.loc[complete.architecture == a, "macro_f1"] for a in architectures],
+        tick_labels=[DISPLAY_NAMES[a] for a in architectures],
+    )
     axes[1, 1].set_ylim(0, 1); axes[1, 1].set_ylabel("Three-class macro-F1"); axes[1, 1].set_title("Complete cube × fold records only")
     axes[1, 1].tick_params(axis="x", rotation=15)
     figure.suptitle("Field 1 exhaustive nested supervised outer evaluation", fontsize=16)
