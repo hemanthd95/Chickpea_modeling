@@ -186,3 +186,8 @@ A replacement audit now recomputes a consistent three-component PCA directly fro
 ## Investigator tyre-track annotation
 
 A localhost-only browser annotator was added so the investigator can trace visible tyre-track centrelines directly on aligned standardized PCA first-difference, second-difference, or PCA RGB layers. Each saved polyline is retained in preview-pixel, original-raster, and EPSG map coordinates. JSON, vertex CSV, and GeoJSON outputs are written under `metadata/local/annotations/planter_tracks/`. Annotations are geometric evidence only and do not become chickpea/weed labels automatically.
+
+
+## Standardized PCA validity correction
+
+The first standardized reflectance-PCA run stopped on cube 20 because the provisional audit rejected a spatial spectrum whenever any individual band equaled 65535. Existing project QC had already established the correct NoData rule as `any spectral band > 0`; valid Pika-L observations can contain 65535 in individual bands. The audit now follows the frozen project rule, records finite/observed/valid preview counts per cube, and reports those counts in any future failure message. No output from the failed run was accepted.
