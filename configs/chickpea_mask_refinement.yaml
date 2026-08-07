@@ -82,6 +82,22 @@ planter_pass_reconstruction:
     parallel_tolerance_degrees: 12.0
     candidate_grouping_radius_m: 0.20
     minimum_candidate_area_m2: 0.05
+  # Replacement for the overly permissive generic nonparallel-line audit.
+  # PCA is recomputed consistently from each original observed reflectance cube,
+  # and only broad structure transverse to the crop rows is proposed for review.
+  standardized_turn_band_audit:
+    maximum_preview_dimension_pixels: 900
+    maximum_pca_fit_samples: 100000
+    seed: 42
+    structure_percentile: 85
+    profile_smoothing_m: 0.12
+    minimum_valid_width_fraction: 0.25
+    edge_exclusion_m: 0.50
+    minimum_candidate_separation_m: 0.75
+    minimum_robust_z: 3.0
+    minimum_prominence_z: 1.5
+    minimum_band_width_m: 0.15
+    maximum_band_width_m: 4.00
   outputs:
     - pca_derivative_false_colour_overview
     - wheel_track_candidates
