@@ -42,3 +42,17 @@ overlap_label_consistency:
   report_cross_cube_and_within_cube_separately: true
   modify_authoritative_labels: false
   field2_locked: true
+
+overlap_model_sensitivity:
+  status: frozen_before_overlap_sensitivity_inference
+  ground_cell_scale: 1.0_native_median_gsd
+  populations:
+    - first_view
+    - unanimous_label
+  first_view_rule: first_observation_in_lexicographic_cube_id_order
+  unanimous_label_rule: retain_unique_cells_and_repeated_cells_only_when_all_labels_agree
+  conflicting_repeated_cells: exclude_from_unanimous_population
+  architectures: all_frozen_supervised_architectures
+  retraining: prohibited
+  model_selection_from_sensitivity_results: prohibited
+  field2_locked: true
