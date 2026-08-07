@@ -725,3 +725,26 @@ corrections.
   predeclared 5×5 label-neighborhood audit to distinguish class-boundary
   misregistration from interior label inconsistency and to separate cross-cube
   repeats from any within-cube grid collisions. No labels are changed.
+
+
+### Repeated-view label inconsistency confirmed; model sensitivity frozen
+
+- All 1,200,835 native-GSD repeats are cross-cube observations; there are no
+  within-cube grid collisions. Cross-cube disagreement ranges from 43.80% to
+  58.02% across outer folds, so it is not isolated to one geographic split.
+- Boundary structure explains a substantial share but not all disagreement:
+  neither-view-interior pairs disagree 50.62%, one-interior pairs 45.67%, and
+  pairs for which both 5×5 neighborhoods are class-interior still disagree
+  22.95%.
+- Chickpea is especially unstable across repeated views: a reference chickpea
+  label is repeated as chickpea only 11.04%, versus 57.04% soil and 31.92% weed.
+  This is treated as observed mask/georegistration uncertainty, not biological
+  evidence of hidden weed subclasses.
+- Before sensitivity predictions, froze two label-transparent populations at
+  native GSD: one deterministic lexicographic view per cell, and a stricter
+  population retaining unique cells plus repeated cells only when every observed
+  label agrees. Conflicting cells are excluded only from the latter sensitivity;
+  primary exhaustive results remain unchanged.
+- Added resumable dual-GPU inference for all three frozen supervised
+  architectures. Models are not retrained or selected from sensitivity results,
+  individual probabilities are not persisted, and Field 2 remains locked.
