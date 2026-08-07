@@ -25,3 +25,12 @@ evaluation:
   mixed_precision: true
   bootstrap_replicates: 1000
   bootstrap_seed: 42
+
+overlap_sensitivity:
+  status: predeclared_before_ground_cell_audit
+  native_gsd_multipliers: [1.0, 2.0]
+  anchor_x_m: 0.0
+  anchor_y_m: 0.0
+  selection_rule: first_observation_in_lexicographic_cube_id_order
+  model_selection_from_sensitivity_results: prohibited
+  field2_locked: true
