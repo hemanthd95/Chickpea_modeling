@@ -1,4 +1,4 @@
-status: six_row_block_candidates_pending
+status: review_only_ready_for_evidence_audit
 field: Field 1
 source_class: authoritative_chickpea
 reassignment_if_accepted: weed
@@ -27,7 +27,7 @@ row_detection:
   local_orientation_minimum_ratio: 1.10
 
 alley_review:
-  derive_experimental_envelope_from_verified_plots: true
+  derive_experimental_envelope_from_verified_plots: false
   plot_boundary_buffer_m: 0.15
 
 review:
