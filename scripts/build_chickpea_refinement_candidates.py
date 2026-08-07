@@ -76,7 +76,12 @@ def detect_row_lines(mask: np.ndarray, gsd: float, settings: dict) -> tuple[np.n
     )
     if lines is None:
         raise ValueError("Hough transform found no candidate row lines")
-    segments = lines[:, 0, :].astype(float)
+    # OpenCV packages HoughLinesP output as either (N, 1, 4) or (N, 4),
+    # depending on the build. Normalize both representations explicitly.
+    line_array = np.asarray(lines)
+    if line_array.size == 0 or line_array.size % 4:
+        raise ValueError(f"Unexpected HoughLinesP output shape: {line_array.shape}")
+    segments = line_array.reshape(-1, 4).astype(float)
     dx = segments[:, 2] - segments[:, 0]
     dy = segments[:, 3] - segments[:, 1]
     lengths = np.hypot(dx, dy)
