@@ -63,3 +63,9 @@ may be deleted and regenerated from the documented scripts.
   disagreement, and PNG visual QC before overlap-sensitivity inference.
 - `contracts/field1_ground_cell_overlap_audit_contract.yaml`: hashes the
   predeclared 1× and 2× native-GSD support audit; it is not a performance result.
+
+
+- `reports/overlap_sensitivity/overlap_label_*.csv` and
+  `overlap_label_consistency_overview.png`: repeated-view class-pair,
+  boundary/interior, fold, and 5 m-group diagnostics. These reports diagnose
+  mask/georegistration consistency and never modify authoritative labels.
