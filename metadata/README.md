@@ -53,3 +53,6 @@ may be deleted and regenerated from the documented scripts.
 - `reports/models/supervised_outer_evaluation/`: exhaustive nested Field 1
   supervised metrics, fold/cube/5 m-group confusion counts, cluster-bootstrap
   uncertainty, timing reports, and the final supervised PNG.
+- `reports/models/supervised_outer_evaluation/architecture_paired_*.csv` and
+  `supervised_outer_architecture_comparison.png`: paired 5 m-group uncertainty
+  and fold-consistency audit for the frozen architecture comparison.
