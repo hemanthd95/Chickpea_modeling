@@ -64,7 +64,9 @@ def circular_distance_degrees(values: np.ndarray, center: float) -> np.ndarray:
     return np.abs((values - center + 90.0) % 180.0 - 90.0)
 
 
-def detect_row_lines(mask: np.ndarray, gsd: float, settings: dict) -> tuple[np.ndarray, float, int]:
+def detect_row_lines(
+    mask: np.ndarray, gsd: float, settings: dict
+) -> tuple[np.ndarray, float, int, int, float]:
     image = mask.astype(np.uint8) * 255
     lines = cv2.HoughLinesP(
         image,
@@ -97,21 +99,68 @@ def detect_row_lines(mask: np.ndarray, gsd: float, settings: dict) -> tuple[np.n
             f"Only {int(inliers.sum())} Hough lines support dominant orientation {dominant:.1f} degrees"
         )
 
-    # Candidate row support follows the dominant inlier lines. Extending them
-    # across the raster reconstructs complete straight rows from fragmented
-    # plant detections; plot/alleys remain a separate review overlay.
+    # Merge duplicate Hough detections belonging to the same physical row using
+    # their perpendicular offset. Only long, well-supported clusters may create
+    # an extended candidate row; otherwise many weak parallel detections can
+    # cover nearly the entire raster.
+    theta = math.radians(dominant)
+    along = np.array([math.cos(theta), math.sin(theta)])
+    normal = np.array([-math.sin(theta), math.cos(theta)])
+    midpoints = np.column_stack(
+        ((segments[:, 0] + segments[:, 2]) / 2.0, (segments[:, 1] + segments[:, 3]) / 2.0)
+    )
+    offsets = midpoints @ normal
+    along_end_1 = segments[:, :2] @ along
+    along_end_2 = segments[:, 2:] @ along
+    inlier_indices = np.flatnonzero(inliers)
+    ordered = inlier_indices[np.argsort(offsets[inlier_indices])]
+    tolerance_pixels = float(settings["offset_cluster_tolerance_m"]) / gsd
+    clusters: list[list[int]] = []
+    for index in ordered:
+        if not clusters:
+            clusters.append([int(index)])
+            continue
+        previous = clusters[-1]
+        previous_weights = lengths[previous]
+        previous_center = float(np.average(offsets[previous], weights=previous_weights))
+        if abs(float(offsets[index]) - previous_center) <= tolerance_pixels:
+            previous.append(int(index))
+        else:
+            clusters.append([int(index)])
+
+    accepted: list[tuple[float, float, float, int]] = []
+    for cluster in clusters:
+        weights = lengths[cluster]
+        center = float(np.average(offsets[cluster], weights=weights))
+        low = float(np.minimum(along_end_1[cluster], along_end_2[cluster]).min())
+        high = float(np.maximum(along_end_1[cluster], along_end_2[cluster]).max())
+        span_m = (high - low) * gsd
+        total_length_m = float(weights.sum() * gsd)
+        if (
+            span_m >= float(settings["minimum_cluster_span_m"])
+            and total_length_m >= float(settings["minimum_cluster_total_line_length_m"])
+        ):
+            accepted.append((center, span_m, total_length_m, len(cluster)))
+    if not accepted:
+        raise ValueError(
+            "No dominant-orientation Hough cluster met the declared longitudinal support thresholds"
+        )
+
     canvas = np.zeros(mask.shape, dtype=np.uint8)
     if settings.get("extend_inlier_lines_across_raster", False):
         extension = 2 * max(mask.shape)
     else:
         extension = max(1, round(float(settings["maximum_line_gap_m"]) / gsd))
-    for segment, length in zip(segments[inliers], lengths[inliers]):
-        x1, y1, x2, y2 = segment
-        ux, uy = (x2 - x1) / length, (y2 - y1) / length
-        p1 = (round(x1 - ux * extension), round(y1 - uy * extension))
-        p2 = (round(x2 + ux * extension), round(y2 + uy * extension))
+    for center, _, _, _ in accepted:
+        point = normal * center
+        p1 = tuple(int(value) for value in np.rint(point - along * extension))
+        p2 = tuple(int(value) for value in np.rint(point + along * extension))
         cv2.line(canvas, p1, p2, color=1, thickness=1)
-    return canvas.astype(bool), dominant, int(inliers.sum())
+    accepted_offsets = np.sort(np.array([item[0] for item in accepted], dtype=float))
+    median_spacing_m = (
+        float(np.median(np.diff(accepted_offsets)) * gsd) if len(accepted_offsets) > 1 else float("nan")
+    )
+    return canvas.astype(bool), dominant, int(inliers.sum()), len(accepted), median_spacing_m
 
 
 def preferred_plot_geometries(project: Path, local: Path) -> list[dict[str, object]]:
@@ -193,7 +242,9 @@ def main() -> None:
         if original.shape != shape:
             raise ValueError(f"Mask/reference shape mismatch for {record.cube_id}")
         gsd = metres_per_pixel(transform)
-        line_seed, angle, inlier_lines = detect_row_lines(original, gsd, config["row_detection"])
+        line_seed, angle, inlier_lines, accepted_rows, median_spacing_m = detect_row_lines(
+            original, gsd, config["row_detection"]
+        )
 
         plot_masks = {
             buffer_m: plot_support(plot_geometries, shape, transform, buffer_m, gsd)
@@ -229,6 +280,8 @@ def main() -> None:
                 "removed_off_row_pixels": int((original & ~row_corridor).sum()),
                 "dominant_image_row_angle_degrees": angle,
                 "hough_inlier_lines": inlier_lines,
+                "accepted_row_clusters": accepted_rows,
+                "median_accepted_row_spacing_m": median_spacing_m,
                 "equivalent_gsd_m": gsd,
                 "candidate_path": str(row_path),
             })
@@ -254,6 +307,8 @@ def main() -> None:
                     "removed_off_row_pixels": int((original & ~row_corridor).sum()),
                     "dominant_image_row_angle_degrees": angle,
                     "hough_inlier_lines": inlier_lines,
+                    "accepted_row_clusters": accepted_rows,
+                    "median_accepted_row_spacing_m": median_spacing_m,
                     "equivalent_gsd_m": gsd,
                     "candidate_path": str(candidate_path),
                 })
@@ -290,7 +345,7 @@ def main() -> None:
             axis.axis("off")
         figure.suptitle(
             f"{record.cube_id} chickpea refinement candidates | row angle {angle:.1f}° | "
-            f"{inlier_lines} Hough lines",
+            f"{accepted_rows} supported row clusters",
             fontsize=15,
         )
         comparison_path = comparisons / f"{record.cube_id}_refinement_candidates.png"
@@ -299,6 +354,7 @@ def main() -> None:
         output_paths.append(comparison_path)
         print(
             f"Prepared {number}/{len(records)} {record.cube_id}: angle={angle:.1f}°, "
+            f"rows={accepted_rows}, spacing={median_spacing_m:.2f} m, "
             f"row retention={review_candidate.sum() / original.sum():.1%}, "
             f"plot overlap={plot_overlap_fraction:.1%}",
             flush=True,
