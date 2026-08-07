@@ -708,3 +708,20 @@ corrections.
 - This audit verifies all 12,782,603 exhaustive support observations, emits CSVs,
   PNG visual QC, and a hashed local contract. It performs no model inference and
   keeps Field 2 locked.
+
+
+### Native-GSD overlap support passed; label-consistency diagnosis staged
+
+- The native raster resolution is 1.5 cm for 18 labeled cubes and 2.0 cm for
+  Cube 28. At the predeclared 1× median-GSD grid, 11,581,768 of 12,782,603
+  exhaustive observations remain after deterministic de-duplication (90.61%).
+- Class retention is balanced: 89.94% soil, 91.49% chickpea, and 91.45% weed.
+  The class mixture therefore changes by less than half a percentage point.
+- The 2× grid retains only 23.31% because each 3 cm cell deliberately aggregates
+  roughly four native pixels; it is retained as a coarse-scale stress test and is
+  not interpreted as literal repeated-observation removal.
+- At 1× GSD, 576,067 repeated observations disagree with the first retained label,
+  or 47.97% of removed observations (4.51% of all observations). Added a
+  predeclared 5×5 label-neighborhood audit to distinguish class-boundary
+  misregistration from interior label inconsistency and to separate cross-cube
+  repeats from any within-cube grid collisions. No labels are changed.
