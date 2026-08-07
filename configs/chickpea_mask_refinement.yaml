@@ -7,6 +7,7 @@ reassignment_if_accepted: weed
 # automatically selected from the resulting retention rates.
 plot_buffer_candidates_m: [0.00, 0.15]
 row_corridor_half_width_candidates_m: [0.06, 0.10, 0.15]
+plot_constraint_mode: review_only
 
 row_detection:
   hough_threshold: 40
@@ -15,6 +16,7 @@ row_detection:
   orientation_bin_degrees: 2.0
   orientation_tolerance_degrees: 8.0
   minimum_inlier_lines: 3
+  extend_inlier_lines_across_raster: true
 
 review:
   write_candidate_geotiffs: true
