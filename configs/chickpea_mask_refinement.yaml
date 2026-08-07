@@ -1,4 +1,4 @@
-status: investigator_review_candidates
+status: six_row_block_candidates_pending
 field: Field 1
 source_class: authoritative_chickpea
 reassignment_if_accepted: weed
@@ -36,3 +36,20 @@ review:
   automatically_retrain_models: false
   field2_locked: true
   raw_masks_are_immutable: true
+
+investigator_guidance:
+  field1_cube20:
+    orange_default_action: retain_as_chickpea
+    manual_review_region: top_between_rows_and_alleys
+  phenology_exclusions_from_refined_primary_supervised_analysis:
+    field1_cube24:
+      reason: recent planting substantially closer to 2025-05-06 image collection
+      retain_for: [immutable_inventory, sensitivity_analysis]
+    field1_cube28:
+      reason: recent planting substantially closer to 2025-05-06 image collection
+      retain_for: [immutable_inventory, sensitivity_analysis]
+  optional_mask_expansion:
+    cubes: [field1_cube12, field1_cube14, field1_cube15]
+    source: raw_spectronon_bip_masks
+    status: human_review_required
+    note: Chickpea signal is strong but weed contamination is substantial; never admit automatically.
