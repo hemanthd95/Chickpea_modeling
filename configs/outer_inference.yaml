@@ -34,3 +34,11 @@ overlap_sensitivity:
   selection_rule: first_observation_in_lexicographic_cube_id_order
   model_selection_from_sensitivity_results: prohibited
   field2_locked: true
+
+overlap_label_consistency:
+  status: predeclared_before_label_consistency_audit
+  native_gsd_multiplier: 1.0
+  interior_neighbourhood_radius_pixels: 2
+  report_cross_cube_and_within_cube_separately: true
+  modify_authoritative_labels: false
+  field2_locked: true
