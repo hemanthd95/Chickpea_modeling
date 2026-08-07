@@ -77,3 +77,12 @@ may be deleted and regenerated from the documented scripts.
 - `contracts/field1_supervised_overlap_sensitivity_contract.yaml`: hashes the
   completed overlap sensitivity and records that no retraining or model selection
   occurred.
+
+
+- `reports/mask_visualization/chickpea_only/`: one authoritative chickpea-only
+  PNG per Field 1 cube.
+- `reports/mask_visualization/source_vs_authoritative/`: source chickpea masks
+  beside model-ready masks and precedence removals.
+- `reports/mask_visualization/field1_chickpea_masks_overview.png` and
+  `field1_chickpea_mask_summary.csv`: all-cube investigator overview and
+  full-resolution mask statistics.
