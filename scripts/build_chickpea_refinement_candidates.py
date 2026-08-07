@@ -176,7 +176,9 @@ def main() -> None:
     for number, record in enumerate(records, start=1):
         labels = authoritative_class_map(record)
         original = labels == 1
-        with rasterio.open(record.header) as reference:
+        # GDAL/Rasterio opens an ENVI dataset through its binary payload; the
+        # .hdr file is metadata-only and cannot be selected as the dataset.
+        with rasterio.open(record.data) as reference:
             transform = reference.transform
             profile = reference.profile
             shape = (reference.height, reference.width)
