@@ -10,7 +10,9 @@ row_corridor_half_width_candidates_m: [0.06, 0.10, 0.15]
 plot_constraint_mode: review_only
 
 row_detection:
+  planter_rows_per_block: 6
   known_planter_row_spacing_m: 0.9144
+  lattice_phase_mode: independent_per_six_row_block
   lattice_phase_fit_half_width_m: 0.10
   hough_threshold: 40
   minimum_line_length_m: 0.60
@@ -28,6 +30,7 @@ row_detection:
 
 alley_review:
   derive_experimental_envelope_from_verified_plots: false
+  require_explicit_alley_geometry: true
   plot_boundary_buffer_m: 0.15
 
 review:
@@ -55,7 +58,7 @@ investigator_guidance:
     note: Chickpea signal is strong but weed contamination is substantial; never admit automatically.
 
 planter_pass_reconstruction:
-  status: review_only_pending_implementation
+  status: geometry_evidence_audit_ready
   evidence_layers:
     - pca
     - pca_first_derivative
@@ -69,6 +72,16 @@ planter_pass_reconstruction:
   fit_independent_phase_per_pass: true
   geometry_evidence_is_not_a_class_label: true
   require_investigator_visual_approval: true
+  evidence_audit:
+    maximum_preview_dimension_pixels: 900
+    canny_low: 60
+    canny_high: 150
+    hough_threshold: 35
+    minimum_segment_length_m: 0.50
+    maximum_segment_gap_m: 0.20
+    parallel_tolerance_degrees: 12.0
+    candidate_grouping_radius_m: 0.20
+    minimum_candidate_area_m2: 0.05
   outputs:
     - pca_derivative_false_colour_overview
     - wheel_track_candidates
