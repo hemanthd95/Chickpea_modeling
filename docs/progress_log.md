@@ -688,3 +688,23 @@ corrections.
   differences and fold-wise geographic consistency before the supervised baseline
   is frozen for SSL comparison. No new inference is performed and Field 2 remains
   locked.
+
+
+### Paired supervised audit passed; overlap sensitivity staged
+
+- Paired equal-5 m-group bootstrap inference confirms center-context fusion over
+  both frozen comparators. Fusion improved macro-F1 by 0.024510 versus the
+  center-spectrum MLP (95% interval 0.010499–0.039788) and by 0.036095 versus
+  spatial-average CNN (0.029376–0.042737).
+- Fusion materially improved chickpea F1 over both comparators, although its
+  absolute exhaustive chickpea F1 remains low and is a declared limitation.
+  Center-spectrum retained higher soil F1, and Fold 3 showed a small fusion
+  macro-F1 deficit versus center-spectrum; neither exception is concealed.
+- Added a deterministic observed-data overlap audit before sensitivity inference.
+  It derives median native GSD from raster transforms, evaluates predeclared 1×
+  and 2× native-GSD ground grids, retains the first lexicographic cube observation
+  without using labels or predictions, and quantifies removed repeats and
+  cross-cube label disagreement.
+- This audit verifies all 12,782,603 exhaustive support observations, emits CSVs,
+  PNG visual QC, and a hashed local contract. It performs no model inference and
+  keeps Field 2 locked.
