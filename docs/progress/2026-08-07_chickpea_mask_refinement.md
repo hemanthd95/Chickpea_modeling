@@ -181,3 +181,8 @@ than silently substituted. No mask is modified and no model is retrained.
 The first PCA-derived Hough audit completed on 15 cubes; cube 20 was skipped because no student-derived PCA/derivative files exist for it. Review showed that the generic `nonparallel` rule was not specific enough: 38–82% of detected segments were labeled nonparallel in most cubes, and 15 of 21 connected candidates covered approximately 129–209 m². Those candidates are retained as a rejected diagnostic and must not drive mask edits.
 
 A replacement audit now recomputes a consistent three-component PCA directly from each original observed 150-band reflectance cube, including cube 20. It rotates the dominant crop-row direction upright and detects only broad peaks in cross-row derivative energy. This targets transverse headland/turn/wheel-track bands such as the visually distinct structure in cube 47. The stage remains investigator review only; it does not change labels, retrain models, or access Field 2.
+
+
+## Investigator tyre-track annotation
+
+A localhost-only browser annotator was added so the investigator can trace visible tyre-track centrelines directly on aligned standardized PCA first-difference, second-difference, or PCA RGB layers. Each saved polyline is retained in preview-pixel, original-raster, and EPSG map coordinates. JSON, vertex CSV, and GeoJSON outputs are written under `metadata/local/annotations/planter_tracks/`. Annotations are geometric evidence only and do not become chickpea/weed labels automatically.
