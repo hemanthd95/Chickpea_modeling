@@ -645,3 +645,19 @@ corrections.
 - Added the exact results root while retaining checkpoint metadata matching and
   SHA-256 verification against the frozen 45-checkpoint contract. No model was
   retrained, no metric was computed, and Field 2 remained locked.
+
+### Observed-data inference pilot passed and exhaustive evaluation staged
+
+- The real Field 1 pilot verified all three Fold-1 center-context checkpoint hashes
+  and three-seed probability ensembling. Batch 512 achieved 200,273 observed
+  predictions/s at 0.785 GiB peak allocated VRAM and outperformed batches 256 and
+  1,024. Probability sums were accurate within 2.38e-7.
+- Added resumable independent-GPU workers for the five frozen outer folds. Each
+  worker evaluates all three frozen architectures and all three seeds at observed
+  prevalence, using the exact nested normalization and boundary-safe support.
+- Individual pixel probabilities are not persisted. Exact confusion counts are
+  accumulated by fold, cube, and frozen 5 m spatial group, enabling pixel-weighted,
+  equal-group, complete-cube, and 1,000-replicate group-cluster-bootstrap summaries.
+- The aggregate stage verifies 12,782,603 predictions per architecture and produces
+  CSV results, a four-panel PNG, and a hashed evaluation contract. Field 2 remains
+  locked.
