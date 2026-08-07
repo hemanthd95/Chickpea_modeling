@@ -86,3 +86,10 @@ may be deleted and regenerated from the documented scripts.
 - `reports/mask_visualization/field1_chickpea_masks_overview.png` and
   `field1_chickpea_mask_summary.csv`: all-cube investigator overview and
   full-resolution mask statistics.
+
+
+- `local/reports/planter_geometry_evidence/`: read-only PCA/derivative evidence
+  audit for row-parallel structure and numbered nonparallel planter-turn/wheel
+  candidates. Geometry evidence is not a class label.
+- `local/contracts/field1_planter_geometry_evidence_contract.yaml`: hashes and
+  guardrails for the planter-geometry review.
