@@ -153,3 +153,24 @@ vary, so detection will use local edge/ridge magnitude and spatial geometry rath
 than assuming a globally consistent PCA intensity. Numbered pass, wheel-track,
 and turn candidates will be rendered for investigator approval before they
 constrain any mask.
+
+
+## PCA planter-geometry audit implemented
+
+A new read-only script, `scripts/audit_planter_geometry_evidence.py`, inventories
+the PCA, first-difference PCA, and second-difference PCA products for each
+authoritatively masked cube. It creates locally stretched visualizations, derives
+a structural composite from both derivative products, estimates the dominant row
+orientation from the observed chickpea mask, and separates row-parallel structural
+segments from nonparallel evidence.
+
+Nearby nonparallel segments are grouped into numbered investigator-review
+candidates. Candidate centroids are retained in the reflectance raster CRS so a
+later field-level step can de-duplicate structures observed in overlapping UAV
+cubes. The audit deliberately does not call these candidates tractor turns until
+the investigator confirms them.
+
+Outputs include per-cube six-panel PNGs, a Field 1 overview PNG, product-inventory
+CSV, segment CSV, numbered-candidate CSV, and a provenance contract. Missing or
+ambiguous derivative products and shape mismatches are reported and skipped rather
+than silently substituted. No mask is modified and no model is retrained.
