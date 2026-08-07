@@ -92,14 +92,21 @@ def robust_scale(channel: np.ndarray, valid: np.ndarray | None = None) -> np.nda
 
 def standardized_preview_pca(
     memory: np.ndarray, step: int, maximum_fit_samples: int, seed: int
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, dict[str, int]]:
     sampled = np.asarray(memory[::step, ::step, :], dtype=np.float32)
-    valid = np.all(np.isfinite(sampled), axis=2)
-    valid &= np.any(sampled != 0, axis=2)
-    valid &= np.all(sampled < 65535, axis=2)
+    finite = np.all(np.isfinite(sampled), axis=2)
+    # Match the frozen project NoData contract: a spatial pixel is observed
+    # when at least one spectral band is positive. A value of 65535 in an
+    # individual band is not automatically NoData in the stored Pika-L cubes.
+    observed = np.any(sampled > 0, axis=2)
+    valid = finite & observed
     spectra = sampled[valid]
     if len(spectra) < 1000:
-        raise ValueError("Too few valid reflectance spectra for standardized PCA")
+        raise ValueError(
+            "Too few valid reflectance spectra for standardized PCA: "
+            f"valid={len(spectra):,}, finite_pixels={int(finite.sum()):,}, "
+            f"observed_pixels={int(observed.sum()):,}, total_pixels={valid.size:,}"
+        )
     rng = np.random.default_rng(seed)
     if len(spectra) > maximum_fit_samples:
         spectra = spectra[rng.choice(len(spectra), maximum_fit_samples, replace=False)]
@@ -117,7 +124,14 @@ def standardized_preview_pca(
         chosen = indices[start:start + chunk]
         scores[chosen] = pca.transform((flat[chosen] - mean) / std).astype(np.float32)
     scores = scores.reshape(sampled.shape[:2] + (3,))
-    return scores, valid, pca.explained_variance_ratio_, mean
+    diagnostics = {
+        "preview_total_pixels": int(valid.size),
+        "preview_finite_pixels": int(finite.sum()),
+        "preview_observed_pixels": int(observed.sum()),
+        "preview_valid_pca_pixels": int(valid.sum()),
+        "pca_fit_spectra": int(len(spectra)),
+    }
+    return scores, valid, pca.explained_variance_ratio_, mean, diagnostics
 
 
 def pca_rgb(scores: np.ndarray, valid: np.ndarray) -> np.ndarray:
@@ -262,7 +276,7 @@ def main() -> None:
             print(f"Skipped {record.cube_id}: row angle unresolved")
             continue
         step = max(1, math.ceil(max(height, width) / max_preview))
-        scores, valid, explained, _ = standardized_preview_pca(
+        scores, valid, explained, _, pca_diagnostics = standardized_preview_pca(
             memory, step, int(settings["maximum_pca_fit_samples"]), seed
         )
         rgb = pca_rgb(scores, valid)
@@ -380,6 +394,7 @@ def main() -> None:
             "pca_explained_variance_1": float(explained[0]),
             "pca_explained_variance_2": float(explained[1]),
             "pca_explained_variance_3": float(explained[2]),
+            **pca_diagnostics,
             "candidate_bands": len(candidates),
             "preview_path": str(preview_path),
         })
@@ -390,7 +405,11 @@ def main() -> None:
         })
         overview_step = max(1, math.ceil(max(overlay_original.shape[:2]) / 320))
         overview_tiles.append((record.cube_id, overlay_original[::overview_step, ::overview_step], len(candidates), analysis_role))
-        print(f"Prepared {number}/{len(records)} {record.cube_id}: {len(candidates)} transverse candidate bands")
+        print(
+            f"Prepared {number}/{len(records)} {record.cube_id}: "
+            f"{pca_diagnostics['preview_valid_pca_pixels']:,} valid preview spectra; "
+            f"{len(candidates)} transverse candidate bands"
+        )
 
     inventory = pd.DataFrame(inventory_rows)
     candidate_frame = pd.DataFrame(candidate_rows)
