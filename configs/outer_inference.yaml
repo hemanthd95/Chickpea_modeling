@@ -19,3 +19,9 @@ primary:
   cluster_bootstrap_replicates: 1000
   cluster_bootstrap_seed: 42
   field2_locked: true
+
+evaluation:
+  gpu_indices: [0, 1]
+  mixed_precision: true
+  bootstrap_replicates: 1000
+  bootstrap_seed: 42
