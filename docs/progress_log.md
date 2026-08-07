@@ -636,3 +636,12 @@ corrections.
 - The pilot computes no target metric and cannot become a reported performance
   result. It writes throughput and peak-VRAM CSVs, a PNG, and a frozen selected-batch
   contract before exhaustive inference is implemented. Field 2 remains locked.
+
+### Outer-inference pilot checkpoint discovery correction
+
+- The first pilot invocation stopped before data or GPU inference because checkpoint
+  discovery omitted the repository's `results/` directory. The frozen checkpoints
+  themselves were intact under `results/supervised_nested_training/outer_fold*/`.
+- Added the exact results root while retaining checkpoint metadata matching and
+  SHA-256 verification against the frozen 45-checkpoint contract. No model was
+  retrained, no metric was computed, and Field 2 remained locked.
