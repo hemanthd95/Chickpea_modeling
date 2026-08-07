@@ -102,3 +102,30 @@ candidate design will:
    inferred from incomplete plot polygons; and
 5. preserve an uncertain class during review rather than automatically converting
    every rejected chickpea pixel to weed.
+
+
+## Investigator-guided six-row design and cube decisions
+
+The planter has six planting units with 3 ft (0.9144 m) spacing between adjacent
+rows. The next geometric candidate must therefore detect six-row blocks rather
+than fit one unrestricted lattice across an entire cube. Each disconnected block
+will share the known orientation and spacing but receive an independently fitted
+phase and longitudinal extent.
+
+The investigator identified Cubes 24 and 28 as recently planted substantially
+closer to the 2025-05-06 image-collection date. They are prospectively excluded
+from the revised primary supervised mask training and evaluation because their
+phenological stage is not comparable. They remain immutable in the inventory and
+will be retained in a separately reported sensitivity analysis; previous results
+are not deleted or rewritten.
+
+For Cube 20, orange pixels in the rejected overview are chickpea by default.
+Only the upper area between rows and within the alleys requires removal through
+investigator-guided spatial review. This is explicit evidence that the rejected
+convex-hull rule cannot be reused.
+
+Raw Spectronon BIP masks for Cubes 12, 14, and 15 are staged as optional label
+expansion. They have strong chickpea signal but substantial weed contamination,
+so they cannot enter training automatically. They require the same six-row
+geometry plus investigator visual approval and will be versioned separately from
+the current authoritative masks.
