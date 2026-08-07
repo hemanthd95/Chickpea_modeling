@@ -10,6 +10,8 @@ row_corridor_half_width_candidates_m: [0.06, 0.10, 0.15]
 plot_constraint_mode: review_only
 
 row_detection:
+  known_planter_row_spacing_m: 0.9144
+  lattice_phase_fit_half_width_m: 0.10
   hough_threshold: 40
   minimum_line_length_m: 0.60
   maximum_line_gap_m: 0.30
@@ -20,6 +22,13 @@ row_detection:
   offset_cluster_tolerance_m: 0.12
   minimum_cluster_span_m: 1.50
   minimum_cluster_total_line_length_m: 1.50
+  local_orientation_window_length_m: 0.60
+  local_orientation_window_width_m: 0.06
+  local_orientation_minimum_ratio: 1.10
+
+alley_review:
+  derive_experimental_envelope_from_verified_plots: true
+  plot_boundary_buffer_m: 0.15
 
 review:
   write_candidate_geotiffs: true
