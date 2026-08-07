@@ -24,3 +24,17 @@ yet reassigned, no supervised model is retrained, and no held-out performance is
 used to tune geometry. If the investigator accepts a variant, removed chickpea
 pixels will be reassigned to weed under a new authoritative-mask version with a
 complete provenance and rollback contract. Field 2 remains locked.
+
+## Engineering correction after the first attempted run
+
+The initial combined constraint stopped on Cube 22 because the verified plot
+polygons do not intersect every labeled cube. Cube 20 also retained only 6.4%
+when row support was restricted to short Hough segments. These are method-design
+failures, not candidate results, and no authoritative mask was changed.
+
+Plot polygons are now explicitly review-only until their spatial completeness is
+verified cube by cube. Each cube receives row-only candidates independently of
+plot coverage, while plot-and-row intersections are retained as separate visual
+diagnostics. Dominant-orientation Hough lines are extended across each raster to
+reconstruct full straight rows from fragmented plant detections. This correction
+does not select a threshold and remains subject to investigator visual review.
