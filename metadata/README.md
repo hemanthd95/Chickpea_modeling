@@ -49,3 +49,7 @@ may be deleted and regenerated from the documented scripts.
   three-architecture × three-seed balanced supervised benchmark, with isolated
   fold outputs, an aggregate PNG, and a hashed completion contract. It measures
   development stability and is not exhaustive held-out-mask evaluation.
+
+- `reports/models/supervised_outer_evaluation/`: exhaustive nested Field 1
+  supervised metrics, fold/cube/5 m-group confusion counts, cluster-bootstrap
+  uncertainty, timing reports, and the final supervised PNG.
