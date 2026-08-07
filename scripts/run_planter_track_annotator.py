@@ -30,7 +30,7 @@ HTML = r'''<!doctype html>
 <style>
 :root { color-scheme: dark; font-family: system-ui, sans-serif; }
 body { margin: 0; background: #101418; color: #edf2f7; }
-header { padding: 10px 14px; background: #182028; border-bottom: 1px solid #39434d; }
+header { position: sticky; top: 0; z-index: 10; padding: 10px 14px; background: #182028; border-bottom: 1px solid #39434d; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 button, select, input { font: inherit; color: inherit; background: #26313b; border: 1px solid #52606d; border-radius: 5px; padding: 6px 9px; }
 button:hover { background: #33414d; }
@@ -39,7 +39,7 @@ button.danger { background: #7f1d1d; border-color: #b64242; }
 label { display: flex; gap: 5px; align-items: center; }
 #stage { position: relative; margin: 12px auto; width: min(95vw, 1100px); }
 canvas { width: 100%; height: auto; display: block; background: #063b3d; border: 1px solid #52606d; cursor: crosshair; }
-#status { padding: 4px 14px 12px; color: #cbd5e1; }
+#status { padding-top: 8px; color: #cbd5e1; }
 #help { padding: 0 14px 12px; color: #aeb9c4; font-size: 0.92rem; }
 .dirty { color: #ffcc66 !important; }
 </style>
@@ -66,10 +66,11 @@ canvas { width: 100%; height: auto; display: block; background: #063b3d; border:
     <button id="undoLine">Undo last line</button>
     <button id="clear" class="danger">Clear cube</button>
     <button id="save" class="primary">Save annotations</button>
+    <button id="backup">Download backup JSON</button>
   </div>
+  <div id="status">Loading…</div>
 </header>
 <div id="stage"><canvas id="canvas"></canvas></div>
-<div id="status">Loading…</div>
 <div id="help">Click along the centre of a visible tyre mark. Use several points for a curve. Press Enter or “Finish line” when complete. Mark each physical tyre track separately; switch between first and second difference as needed.</div>
 <script>
 const canvas = document.getElementById('canvas');
@@ -133,6 +134,12 @@ function finishLine() {
   });
   drawing = []; pointer = null; noteInput.value = ''; markDirty(); draw();
 }
+function finishBeforeAction() {
+  if (!drawing.length) return true;
+  if (drawing.length >= 2) { finishLine(); return true; }
+  setStatus('The current line has only one point. Add another point or press Escape to discard it.', true);
+  return false;
+}
 canvas.addEventListener('click', event => { drawing.push(pointFromEvent(event)); markDirty(); draw(); });
 canvas.addEventListener('mousemove', event => { pointer = pointFromEvent(event); draw(); });
 canvas.addEventListener('mouseleave', () => { pointer = null; draw(); });
@@ -140,10 +147,10 @@ document.getElementById('finish').onclick = finishLine;
 document.getElementById('undoPoint').onclick = () => { if (drawing.length) { drawing.pop(); markDirty(); draw(); } };
 document.getElementById('undoLine').onclick = () => { if (lines().length) { lines().pop(); markDirty(); draw(); } };
 document.getElementById('clear').onclick = () => { if (confirm('Delete all annotations for ' + currentCube() + '?')) { state.cubes[currentCube()] = []; drawing = []; markDirty(); draw(); } };
-document.getElementById('previous').onclick = () => { cubeSelect.selectedIndex = Math.max(0, cubeSelect.selectedIndex - 1); loadImage(); };
-document.getElementById('next').onclick = () => { cubeSelect.selectedIndex = Math.min(cubeSelect.options.length - 1, cubeSelect.selectedIndex + 1); loadImage(); };
-cubeSelect.onchange = loadImage;
-layerSelect.onchange = loadImage;
+document.getElementById('previous').onclick = () => { if (!finishBeforeAction()) return; cubeSelect.selectedIndex = Math.max(0, cubeSelect.selectedIndex - 1); loadImage(); };
+document.getElementById('next').onclick = () => { if (!finishBeforeAction()) return; cubeSelect.selectedIndex = Math.min(cubeSelect.options.length - 1, cubeSelect.selectedIndex + 1); loadImage(); };
+cubeSelect.onchange = () => { if (finishBeforeAction()) loadImage(); };
+layerSelect.onchange = () => { if (finishBeforeAction()) loadImage(); };
 kindSelect.onchange = draw;
 document.addEventListener('keydown', event => {
   if (event.key === 'Enter') { event.preventDefault(); finishLine(); }
@@ -151,12 +158,34 @@ document.addEventListener('keydown', event => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); save(); }
 });
 async function save() {
-  const response = await fetch('/api/annotations', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(state)});
-  if (!response.ok) { setStatus('Save failed: ' + await response.text(), true); return; }
-  const result = await response.json(); dirty = false;
-  setStatus('Saved ' + result.lines + ' lines and ' + result.vertices + ' vertices.');
+  if (!finishBeforeAction()) return;
+  const button = document.getElementById('save');
+  button.disabled = true; button.textContent = 'Saving…'; setStatus('Saving annotations to disk…', true);
+  try {
+    const response = await fetch('/api/annotations', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(state)});
+    if (!response.ok) throw new Error(await response.text());
+    const result = await response.json(); dirty = false;
+    button.textContent = 'Saved ✓';
+    setStatus('Saved ' + result.lines + ' lines and ' + result.vertices + ' vertices to disk.');
+    window.setTimeout(() => { button.textContent = 'Save annotations'; }, 1800);
+  } catch (error) {
+    button.textContent = 'Save failed';
+    setStatus('Save failed: ' + String(error) + '. Use Download backup JSON before refreshing.', true);
+  } finally {
+    button.disabled = false;
+  }
 }
 document.getElementById('save').onclick = save;
+document.getElementById('backup').onclick = () => {
+  if (!finishBeforeAction()) return;
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type: 'application/json'});
+  const anchor = document.createElement('a');
+  anchor.href = URL.createObjectURL(blob);
+  anchor.download = 'field1_planter_track_annotations_backup.json';
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(anchor.href), 1000);
+  setStatus('Backup JSON downloaded. This does not replace Save annotations.');
+};
 window.addEventListener('beforeunload', event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
 async function initialize() {
   manifest = await (await fetch('/api/manifest')).json();
@@ -314,6 +343,10 @@ def handler_factory(store: AnnotationStore):
                     raise ValueError("Invalid request size")
                 payload = json.loads(self.rfile.read(length))
                 lines, vertices = store.save(payload)
+                print(
+                    f"Saved planter annotations: {lines} lines, {vertices} vertices -> {store.json_path}",
+                    flush=True,
+                )
                 return self.send_bytes(json.dumps({"lines": lines, "vertices": vertices}).encode(), "application/json")
             except Exception as error:
                 return self.send_bytes(str(error).encode(), "text/plain; charset=utf-8", 400)
