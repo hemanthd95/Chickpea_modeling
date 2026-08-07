@@ -672,3 +672,19 @@ corrections.
   installed Matplotlib version removed the `labels=` boxplot argument. Replaced it
   with `tick_labels=`. Rerunning skips all five verified inference folds and repeats
   aggregation only; no prediction work is lost or duplicated.
+
+### Exhaustive supervised outer evaluation passed; paired audit staged
+
+- Final equal-5 m-group metrics confirm center-context fusion as the strongest
+  supervised model: balanced accuracy 0.699235 and macro-F1 0.671206, compared
+  with 0.674820/0.635110 for spatial-average CNN and 0.652364/0.646696 for the
+  center-spectrum MLP.
+- Fusion achieved soil/chickpea/weed F1 of 0.893603/0.300510/0.819504. Chickpea
+  remains the limiting class; pixel-weighted recall is approximately 0.48, with
+  substantial confusion into both soil and weed. This limitation must be reported,
+  not hidden by the strong soil and weed scores.
+- Added a paired spatial-group bootstrap audit using identical resampled 5 m groups
+  for fusion and each comparator. It reports confidence intervals for performance
+  differences and fold-wise geographic consistency before the supervised baseline
+  is frozen for SSL comparison. No new inference is performed and Field 2 remains
+  locked.
