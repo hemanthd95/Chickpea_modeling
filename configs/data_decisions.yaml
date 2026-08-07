@@ -60,3 +60,29 @@ rules:
   field_identity_boundary_buffer_m: 1.5
   field_identity_buffer_is_not_chickpea_constraint_buffer: true
   chickpea_plot_constraint_buffer_candidates_m: [0.0, 0.15, 0.30, 0.50, 1.0]
+
+investigator_phenology_exclusions:
+  field1_cube24:
+    decision_date: 2026-08-07
+    reason: Recent planting date substantially closer to the 2025-05-06 image collection; chickpea development is not comparable to the primary Field 1 set.
+    exclude_from: [refined_supervised_mask_training, refined_supervised_primary_evaluation]
+    retain_for: [immutable_inventory, documented_sensitivity_analysis]
+  field1_cube28:
+    decision_date: 2026-08-07
+    reason: Recent planting date substantially closer to the 2025-05-06 image collection; chickpea development is not comparable to the primary Field 1 set.
+    exclude_from: [refined_supervised_mask_training, refined_supervised_primary_evaluation]
+    retain_for: [immutable_inventory, documented_sensitivity_analysis]
+
+candidate_label_expansion:
+  field1_cube12:
+    source: raw_spectronon_bip_mask
+    status: human_review_required
+    evidence: Strong chickpea signal with substantial weed contamination.
+  field1_cube14:
+    source: raw_spectronon_bip_mask
+    status: human_review_required
+    evidence: Strong chickpea signal with substantial weed contamination.
+  field1_cube15:
+    source: raw_spectronon_bip_mask
+    status: human_review_required
+    evidence: Strong chickpea signal with substantial weed contamination.
