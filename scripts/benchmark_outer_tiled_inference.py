@@ -65,6 +65,7 @@ def discover_checkpoints(
     if not candidates:
         roots = [
             project / "artifacts", project / "outputs", project / "models",
+            project / "results",
             project / "metadata" / "local" / "reports" / "models",
         ]
         for root in roots:
