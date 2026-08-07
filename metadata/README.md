@@ -56,3 +56,10 @@ may be deleted and regenerated from the documented scripts.
 - `reports/models/supervised_outer_evaluation/architecture_paired_*.csv` and
   `supervised_outer_architecture_comparison.png`: paired 5 m-group uncertainty
   and fold-consistency audit for the frozen architecture comparison.
+
+
+- `reports/overlap_sensitivity/`: native raster resolution, deterministic
+  one-observation-per-ground-cell support, repeated-view removal, cross-cube label
+  disagreement, and PNG visual QC before overlap-sensitivity inference.
+- `contracts/field1_ground_cell_overlap_audit_contract.yaml`: hashes the
+  predeclared 1× and 2× native-GSD support audit; it is not a performance result.
