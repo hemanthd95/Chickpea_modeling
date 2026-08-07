@@ -183,6 +183,10 @@ def main() -> None:
             buffer_m: plot_support(plot_geometries, shape, transform, buffer_m, gsd)
             for buffer_m in plot_buffers
         }
+        if not (original & plot_masks[min(plot_buffers)]).any():
+            raise ValueError(
+                f"Verified plot polygons do not overlap {record.cube_id}; stop and review CRS/transform"
+            )
         candidates: dict[tuple[float, float], np.ndarray] = {}
         for corridor_m in corridor_widths:
             radius = max(1, int(math.ceil(corridor_m / gsd)))
