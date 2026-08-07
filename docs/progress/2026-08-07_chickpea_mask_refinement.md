@@ -174,3 +174,10 @@ Outputs include per-cube six-panel PNGs, a Field 1 overview PNG, product-invento
 CSV, segment CSV, numbered-candidate CSV, and a provenance contract. Missing or
 ambiguous derivative products and shape mismatches are reported and skipped rather
 than silently substituted. No mask is modified and no model is retrained.
+
+
+## PCA geometry audit result and correction
+
+The first PCA-derived Hough audit completed on 15 cubes; cube 20 was skipped because no student-derived PCA/derivative files exist for it. Review showed that the generic `nonparallel` rule was not specific enough: 38–82% of detected segments were labeled nonparallel in most cubes, and 15 of 21 connected candidates covered approximately 129–209 m². Those candidates are retained as a rejected diagnostic and must not drive mask edits.
+
+A replacement audit now recomputes a consistent three-component PCA directly from each original observed 150-band reflectance cube, including cube 20. It rotates the dominant crop-row direction upright and detects only broad peaks in cross-row derivative energy. This targets transverse headland/turn/wheel-track bands such as the visually distinct structure in cube 47. The stage remains investigator review only; it does not change labels, retrain models, or access Field 2.
