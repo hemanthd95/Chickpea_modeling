@@ -72,6 +72,7 @@ def prepare_fold(args, outer, fold_lookup, folds, block_size, origin_x, origin_y
         )
         selected = (sample_folds == outer) & safe
         if not selected.any():
+            print(f"[outer {outer} prepare] {record.cube_id}: 0 eligible observations", flush=True)
             continue
         rows, columns, truth = rows[selected], columns[selected], truth[selected]
         x, y, bx, by = x[selected], y[selected], bx[selected], by[selected]
@@ -86,6 +87,7 @@ def prepare_fold(args, outer, fold_lookup, folds, block_size, origin_x, origin_y
         cell_y_parts.append(np.floor((y - anchor_y) / native_gsd).astype(np.int64))
         label_parts.append(truth)
         cube_parts.append(np.full(count, cube_order, dtype=np.int16))
+        print(f"[outer {outer} prepare] {record.cube_id}: {count:,} eligible observations", flush=True)
 
     cell_x, cell_y = np.concatenate(cell_x_parts), np.concatenate(cell_y_parts)
     labels, cube_order = np.concatenate(label_parts), np.concatenate(cube_parts)
