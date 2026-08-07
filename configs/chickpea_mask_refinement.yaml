@@ -17,6 +17,9 @@ row_detection:
   orientation_tolerance_degrees: 8.0
   minimum_inlier_lines: 3
   extend_inlier_lines_across_raster: true
+  offset_cluster_tolerance_m: 0.12
+  minimum_cluster_span_m: 1.50
+  minimum_cluster_total_line_length_m: 1.50
 
 review:
   write_candidate_geotiffs: true
