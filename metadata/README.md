@@ -69,3 +69,11 @@ may be deleted and regenerated from the documented scripts.
   `overlap_label_consistency_overview.png`: repeated-view class-pair,
   boundary/interior, fold, and 5 m-group diagnostics. These reports diagnose
   mask/georegistration consistency and never modify authoritative labels.
+
+
+- `reports/models/supervised_overlap_sensitivity/`: native-GSD, one-view
+  frozen-model evaluation for both deterministic first-view and unanimous-label
+  populations, with fold/group/cube confusion counts and PNG visual QC.
+- `contracts/field1_supervised_overlap_sensitivity_contract.yaml`: hashes the
+  completed overlap sensitivity and records that no retraining or model selection
+  occurred.
