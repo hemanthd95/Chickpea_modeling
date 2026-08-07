@@ -205,3 +205,9 @@ A non-destructive annotation QC stage was added. It rasterizes the footprints on
 ## Annotation seam-normalization correction
 
 The first footprint-impact audit stopped on a Cube 22 tyre outline because closing its near-returned endpoint introduced one small seam crossing. Full review identified 13 such near-closed traces (12 tyre footprints and one alley footprint). Their investigator-drawn endpoints were at most 0.60 m apart. The audit now deterministically snaps the final near-duplicate endpoint to the first point when the separation is no more than 0.75 m, records the operation in geometry QC, and confirms that all 128 normalized footprints are non-self-intersecting. Original JSON, CSV, and GeoJSON exports remain immutable.
+
+## Alley-impact result and candidate policy
+
+The annotation impact audit completed across 16 cubes. For the 14 primary-candidate cubes, 94,053 of 1,167,954 current chickpea pixels (8.05%) fall inside investigator-drawn alley footprints. The largest proposed corrections are Cube 40 (25,277 pixels; 29.91%), Cube 47 (22,728; 21.63%), and Cube 49 (12,563; 12.13%). Cubes 24 and 28 remain sensitivity-only and cannot enter refined primary training or evaluation.
+
+Tyre footprints are not safe direct removal masks: several magenta intersections visibly follow legitimate chickpea rows, including Cubes 35 and 45. A reversible materialization stage therefore applies only one rule: current chickpea inside an investigator-drawn alley becomes weed. Soil is unchanged, no chickpea is added, tyre annotations cause no class change, and all candidate products remain outside the authoritative manifest pending visual approval.
