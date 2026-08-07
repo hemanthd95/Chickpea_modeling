@@ -661,3 +661,14 @@ corrections.
 - The aggregate stage verifies 12,782,603 predictions per architecture and produces
   CSV results, a four-panel PNG, and a hashed evaluation contract. Field 2 remains
   locked.
+
+### Exhaustive predictions completed; aggregation compatibility corrected
+
+- Completed all five outer folds for all three architectures: 12,782,603 eligible
+  observations per architecture and 38,347,809 architecture-level predictions in
+  total. Each fold matched its frozen support count exactly and wrote a hashed,
+  resumable fold contract.
+- Final plotting stopped after metric and bootstrap tables were created because the
+  installed Matplotlib version removed the `labels=` boxplot argument. Replaced it
+  with `tick_labels=`. Rerunning skips all five verified inference folds and repeats
+  aggregation only; no prediction work is lost or duplicated.
