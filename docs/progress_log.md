@@ -748,3 +748,15 @@ corrections.
 - Added resumable dual-GPU inference for all three frozen supervised
   architectures. Models are not retrained or selected from sensitivity results,
   individual probabilities are not persisted, and Field 2 remains locked.
+
+
+### Investigator-requested chickpea-only mask review staged
+
+- Paused overlap-sensitivity inference before execution to support visual review of
+  every authoritative Field 1 chickpea mask.
+- Added full-resolution counts, one chickpea-only PNG per cube, a high-resolution
+  all-cube overview, and source-versus-authoritative provenance panels. Pixels
+  removed by the frozen weed > chickpea > soil precedence are shown separately.
+- The overview contains only model-ready chickpea pixels on black; no soil, weed,
+  false-colour imagery, or synthetic data are displayed. Raw masks are never
+  modified, and Field 2 remains locked.
