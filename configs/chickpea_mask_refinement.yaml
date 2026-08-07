@@ -53,3 +53,25 @@ investigator_guidance:
     source: raw_spectronon_bip_masks
     status: human_review_required
     note: Chickpea signal is strong but weed contamination is substantial; never admit automatically.
+
+planter_pass_reconstruction:
+  status: review_only_pending_implementation
+  evidence_layers:
+    - pca
+    - pca_first_derivative
+    - pca_second_derivative
+  planter_rows_per_pass: 6
+  row_spacing_m: 0.9144
+  detect_headland_turns: true
+  detect_wheel_tracks: true
+  reconstruct_at_field_mosaic_level: true
+  deduplicate_overlapping_cube_observations: true
+  fit_independent_phase_per_pass: true
+  geometry_evidence_is_not_a_class_label: true
+  require_investigator_visual_approval: true
+  outputs:
+    - pca_derivative_false_colour_overview
+    - wheel_track_candidates
+    - turn_arc_candidates
+    - numbered_six_row_passes
+    - overlap_deduplicated_pass_map
