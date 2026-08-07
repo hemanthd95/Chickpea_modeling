@@ -129,3 +129,27 @@ expansion. They have strong chickpea signal but substantial weed contamination,
 so they cannot enter training automatically. They require the same six-row
 geometry plus investigator visual approval and will be versioned separately from
 the current authoritative masks.
+
+
+## Planter-turn and wheel-track evidence added
+
+The investigator noted that the six-row planter completed one pass, turned in
+the headland, and began the next pass. Tractor wheel marks and turning structures
+are distinctly visible in the PCA, first-derivative PCA, and second-derivative
+PCA imagery. These features provide independent geometric evidence for separating
+adjacent six-row planting blocks and estimating how many planter passes and turns
+are represented.
+
+The next audit will reconstruct planter passes at the georeferenced Field 1 level,
+not independently count features inside every overlapping UAV cube. Candidate
+wheel tracks and turn arcs will be detected from PCA-derived structure, transformed
+to map coordinates, and de-duplicated where cubes observe the same ground area.
+Each accepted pass will define one six-row block with 0.9144 m centerline spacing
+and its own fitted lattice phase and longitudinal extent.
+
+PCA-derived features are geometry evidence only. They cannot assign chickpea,
+weed, or soil labels by themselves. Per-cube PCA component signs and ordering may
+vary, so detection will use local edge/ridge magnitude and spatial geometry rather
+than assuming a globally consistent PCA intensity. Numbered pass, wheel-track,
+and turn candidates will be rendered for investigator approval before they
+constrain any mask.
