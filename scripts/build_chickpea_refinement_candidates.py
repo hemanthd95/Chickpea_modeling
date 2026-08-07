@@ -97,10 +97,14 @@ def detect_row_lines(mask: np.ndarray, gsd: float, settings: dict) -> tuple[np.n
             f"Only {int(inliers.sum())} Hough lines support dominant orientation {dominant:.1f} degrees"
         )
 
-    # Draw only observed inlier segments. A modest endpoint extension bridges
-    # plant gaps without projecting row support through an entire alley.
+    # Candidate row support follows the dominant inlier lines. Extending them
+    # across the raster reconstructs complete straight rows from fragmented
+    # plant detections; plot/alleys remain a separate review overlay.
     canvas = np.zeros(mask.shape, dtype=np.uint8)
-    extension = max(1, round(float(settings["maximum_line_gap_m"]) / gsd))
+    if settings.get("extend_inlier_lines_across_raster", False):
+        extension = 2 * max(mask.shape)
+    else:
+        extension = max(1, round(float(settings["maximum_line_gap_m"]) / gsd))
     for segment, length in zip(segments[inliers], lengths[inliers]):
         x1, y1, x2, y2 = segment
         ux, uy = (x2 - x1) / length, (y2 - y1) / length
@@ -175,7 +179,6 @@ def main() -> None:
     output_paths: list[Path] = []
     plot_buffers = [float(value) for value in config["plot_buffer_candidates_m"]]
     corridor_widths = [float(value) for value in config["row_corridor_half_width_candidates_m"]]
-    review_plot_buffer = min(plot_buffers)
     review_corridor = max(corridor_widths)
 
     for number, record in enumerate(records, start=1):
@@ -196,62 +199,92 @@ def main() -> None:
             buffer_m: plot_support(plot_geometries, shape, transform, buffer_m, gsd)
             for buffer_m in plot_buffers
         }
-        if not (original & plot_masks[min(plot_buffers)]).any():
-            raise ValueError(
-                f"Verified plot polygons do not overlap {record.cube_id}; stop and review CRS/transform"
-            )
-        candidates: dict[tuple[float, float], np.ndarray] = {}
+        exact_plot = plot_masks[min(plot_buffers)]
+        plot_overlap_pixels = int((original & exact_plot).sum())
+        plot_overlap_fraction = plot_overlap_pixels / int(original.sum())
+        plot_status = "overlap_review_only" if plot_overlap_pixels else "no_plot_overlap"
+        row_candidates: dict[float, np.ndarray] = {}
+        combined_candidates: dict[tuple[float, float], np.ndarray] = {}
         for corridor_m in corridor_widths:
             radius = max(1, int(math.ceil(corridor_m / gsd)))
             row_corridor = cv2.dilate(line_seed.astype(np.uint8), ellipse_kernel(radius)).astype(bool)
+            row_candidate = original & row_corridor
+            row_candidates[corridor_m] = row_candidate
+            row_variant = f"row_only_halfwidth_{corridor_m:.2f}m"
+            row_path = candidates_root / row_variant / f"{record.cube_id}_chickpea_candidate.tif"
+            if config["review"]["write_candidate_geotiffs"]:
+                write_mask(row_path, row_candidate, profile)
+            summary_rows.append({
+                "cube_id": record.cube_id,
+                "candidate_type": "row_only",
+                "plot_status": plot_status,
+                "plot_buffer_m": np.nan,
+                "row_corridor_half_width_m": corridor_m,
+                "source_chickpea_pixels": int(original.sum()),
+                "candidate_chickpea_pixels": int(row_candidate.sum()),
+                "retained_fraction": float(row_candidate.sum() / original.sum()),
+                "source_pixels_intersecting_exact_plots": plot_overlap_pixels,
+                "source_fraction_intersecting_exact_plots": plot_overlap_fraction,
+                "removed_outside_plot_pixels": np.nan,
+                "removed_off_row_pixels": int((original & ~row_corridor).sum()),
+                "dominant_image_row_angle_degrees": angle,
+                "hough_inlier_lines": inlier_lines,
+                "equivalent_gsd_m": gsd,
+                "candidate_path": str(row_path),
+            })
             for buffer_m in plot_buffers:
-                candidate = original & plot_masks[buffer_m] & row_corridor
-                candidates[(buffer_m, corridor_m)] = candidate
+                candidate = row_candidate & plot_masks[buffer_m]
+                combined_candidates[(buffer_m, corridor_m)] = candidate
                 variant = f"plot_buffer_{buffer_m:.2f}m_row_halfwidth_{corridor_m:.2f}m"
                 candidate_path = candidates_root / variant / f"{record.cube_id}_chickpea_candidate.tif"
                 if config["review"]["write_candidate_geotiffs"]:
                     write_mask(candidate_path, candidate, profile)
                 summary_rows.append({
                     "cube_id": record.cube_id,
+                    "candidate_type": "plot_and_row_review_only",
+                    "plot_status": plot_status,
                     "plot_buffer_m": buffer_m,
                     "row_corridor_half_width_m": corridor_m,
                     "source_chickpea_pixels": int(original.sum()),
                     "candidate_chickpea_pixels": int(candidate.sum()),
                     "retained_fraction": float(candidate.sum() / original.sum()) if original.any() else 0.0,
                     "removed_outside_plot_pixels": int((original & ~plot_masks[buffer_m]).sum()),
-                    "removed_inside_plot_off_row_pixels": int((original & plot_masks[buffer_m] & ~row_corridor).sum()),
+                    "source_pixels_intersecting_exact_plots": plot_overlap_pixels,
+                    "source_fraction_intersecting_exact_plots": plot_overlap_fraction,
+                    "removed_off_row_pixels": int((original & ~row_corridor).sum()),
                     "dominant_image_row_angle_degrees": angle,
                     "hough_inlier_lines": inlier_lines,
                     "equivalent_gsd_m": gsd,
                     "candidate_path": str(candidate_path),
                 })
 
-        exact_plot = plot_masks[review_plot_buffer]
-        review_candidate = candidates[(review_plot_buffer, review_corridor)]
+        review_candidate = row_candidates[review_corridor]
         categories = np.zeros(shape, dtype=np.uint8)
         categories[review_candidate] = 1
-        categories[original & ~exact_plot] = 2
-        categories[original & exact_plot & ~review_candidate] = 3
+        categories[original & ~review_candidate] = 3
         review_tiles.append((record.cube_id, categories, float(review_candidate.sum() / original.sum())))
 
         figure, axes = plt.subplots(2, 3, figsize=(14, 9), constrained_layout=True)
         axes = axes.reshape(-1)
         axes[0].imshow(original, cmap=ListedColormap(["black", "#22C55E"]), vmin=0, vmax=1)
         axes[0].set_title(f"Current authoritative\n{int(original.sum()):,} pixels")
-        for axis, corridor_m in zip(axes[1:4], corridor_widths):
-            candidate = candidates[(review_plot_buffer, corridor_m)]
+        axes[1].imshow(original & exact_plot, cmap=ListedColormap(["black", "#F59E0B"]), vmin=0, vmax=1)
+        axes[1].set_title(
+            f"Exact plot intersection — review only\n"
+            f"{plot_overlap_pixels:,} ({plot_overlap_fraction:.1%}); {plot_status}"
+        )
+        for axis, corridor_m in zip(axes[2:5], corridor_widths):
+            candidate = row_candidates[corridor_m]
             axis.imshow(candidate, cmap=ListedColormap(["black", "#22C55E"]), vmin=0, vmax=1)
             axis.set_title(
-                f"Exact plots + {corridor_m:.2f} m half-width\n"
+                f"Row-only {corridor_m:.2f} m half-width\n"
                 f"{int(candidate.sum()):,} ({candidate.sum() / original.sum():.1%})"
             )
-        axes[4].imshow(categories, cmap=MASK_CMAP, vmin=0, vmax=3, interpolation="nearest")
-        axes[4].set_title("Green kept; orange outside plots/alleys; red off-row")
-        buffered = candidates[(max(plot_buffers), review_corridor)]
-        axes[5].imshow(buffered, cmap=ListedColormap(["black", "#22C55E"]), vmin=0, vmax=1)
+        combined = combined_candidates[(max(plot_buffers), review_corridor)]
+        axes[5].imshow(combined, cmap=ListedColormap(["black", "#22C55E"]), vmin=0, vmax=1)
         axes[5].set_title(
-            f"{max(plot_buffers):.2f} m plot buffer + {review_corridor:.2f} m row\n"
-            f"{int(buffered.sum()):,} ({buffered.sum() / original.sum():.1%})"
+            f"Plot + row intersection — review only\n"
+            f"{int(combined.sum()):,} ({combined.sum() / original.sum():.1%})"
         )
         for axis in axes:
             axis.axis("off")
@@ -266,7 +299,8 @@ def main() -> None:
         output_paths.append(comparison_path)
         print(
             f"Prepared {number}/{len(records)} {record.cube_id}: angle={angle:.1f}°, "
-            f"review retention={review_candidate.sum() / original.sum():.1%}",
+            f"row retention={review_candidate.sum() / original.sum():.1%}, "
+            f"plot overlap={plot_overlap_fraction:.1%}",
             flush=True,
         )
 
@@ -281,8 +315,8 @@ def main() -> None:
         axis.imshow(categories[::step, ::step], cmap=MASK_CMAP, vmin=0, vmax=3, interpolation="nearest")
         axis.set_title(f"{cube_id} | retained {retention:.1%}")
     figure.suptitle(
-        f"Field 1 chickpea refinement review — exact plots + {review_corridor:.2f} m row half-width\n"
-        "green = retained; orange = outside plot polygons/alleys; red = inside plot but off-row",
+        f"Field 1 row-only chickpea refinement review — {review_corridor:.2f} m row half-width\n"
+        "green = retained chickpea; red = current chickpea outside detected row corridors",
         fontsize=16,
     )
     overview_path = reports / "chickpea_refinement_candidate_overview.png"
@@ -302,6 +336,7 @@ def main() -> None:
         "authoritative_masks_modified": False,
         "models_retrained": False,
         "candidate_reassignment_if_accepted": "removed chickpea -> weed",
+        "plot_constraint_mode": "review_only_due_to_incomplete_cube_coverage",
         "configuration_sha256": sha256(args.config),
         "authoritative_manifest_sha256": sha256(manifest),
         "plot_geometry_qc_sha256": sha256(local / "plot_exact_geometry_qc.csv"),
@@ -315,7 +350,8 @@ def main() -> None:
     contracts.mkdir(parents=True, exist_ok=True)
     contract_path = contracts / "field1_chickpea_refinement_candidate_contract.yaml"
     contract_path.write_text(yaml.safe_dump(contract, sort_keys=False))
-    print(f"\nCandidate variants per cube: {len(plot_buffers) * len(corridor_widths)}")
+    variants_per_cube = len(corridor_widths) * (1 + len(plot_buffers))
+    print(f"\nCandidate variants per cube: {variants_per_cube}")
     print(f"Sensitivity table: {summary_path}")
     print(f"Individual visual QC: {comparisons}")
     print(f"Overview: {overview_path}")
