@@ -107,3 +107,10 @@ may be deleted and regenerated from the documented scripts.
   overlap, 0–0.15 m edge-tolerance sensitivity, and per-cube/all-cube PNG review.
 - `local/contracts/field1_chickpea_region_annotation_qc_contract.yaml`: hashed
   audit record confirming that no authoritative mask or model was changed.
+
+- `local/reports/mask_refinement/polygon_guided_candidate_profile/`: polygon-first
+  observed NDVI support, green/red/red-edge/NIR feature profiles, per-cube PNGs,
+  and an all-cube candidate overview. Historical masks are comparison-only.
+- `local/contracts/field1_polygon_guided_candidate_profile_contract.yaml`: hashes
+  the polygon-first evidence profile before any spectral separator or mask is
+  materialized.
