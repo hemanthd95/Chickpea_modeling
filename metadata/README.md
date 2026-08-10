@@ -121,3 +121,12 @@ may be deleted and regenerated from the documented scripts.
   inferred, and label-expansion cubes remain unresolved without validated soil evidence.
 - `local/contracts/field1_polygon_soil_source_audit_contract.yaml`: hashes the
   read-only soil-source audit and confirms that no label or model changed.
+
+- `local/reports/mask_refinement/polygon_guided_candidate_materialization/`:
+  review-only categorical candidates built from investigator polygons, explicit
+  alleys, provenance-tracked soil masks, and the validated stored-index rule for
+  cubes 12/14/15. Core non-soil pixels remain vegetation candidates—not accepted
+  chickpea labels—and every run writes per-cube and overview PNGs.
+- `local/contracts/field1_polygon_guided_candidate_materialization_contract.yaml`:
+  hashes candidate inputs and outputs while recording that authoritative masks
+  and trained models were not changed.

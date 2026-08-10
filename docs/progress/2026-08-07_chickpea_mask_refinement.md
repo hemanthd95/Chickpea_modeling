@@ -310,3 +310,19 @@ threshold fitting and retained only for sensitivity. A transferred rule is
 review-eligible only if mean leave-one-cube-out AUC is at least 0.75, balanced
 accuracy is at least 0.70, and the direction is stable. Even a passing rule does
 not automatically materialize a mask.
+
+## Stored-index transfer gate passed; review candidates staged
+
+Across 13 primary reference cubes, the lower-valued scalar-index rule achieved
+mean leave-one-cube-out AUC 0.9903 and mean balanced accuracy 0.9414. Held-out
+balanced accuracy ranged from 0.9344 to 0.9488, and fitted thresholds ranged only
+from 0.7206 to 0.7229. The index is therefore transferable as an empirically
+calibrated soil discriminator, but it is not reinterpreted as literal NDVI.
+
+The next stage writes mutually exclusive, review-only support layers. Existing
+cubes retain their provenance-tracked soil masks. Only Cubes 12, 14, and 15 use
+the frozen scalar-index rule, producing provisional soil fractions of 32.98%,
+26.15%, and 34.48% inside eligible polygon cores. Investigator polygons remain
+spatial priors, explicit alleys take precedence, and a 0.05 m outward belt stays
+uncertain. Core non-soil is not yet chickpea: it remains pending observed
+weed-versus-chickpea separation. No authoritative mask or model input changes.

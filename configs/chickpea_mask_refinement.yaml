@@ -153,3 +153,17 @@ stored_index_soil_separability_audit:
   direction_must_be_stable: true
   exclude_phenology_sensitivity_cubes_from_threshold_fitting: true
   automatically_materialize_masks: false
+
+# Enabled only after the stored scalar-index rule passed leave-one-cube-out
+# transfer validation. Existing cubes keep their provenance-tracked soil masks;
+# the calibrated index supplies review-only soil candidates only for 12/14/15.
+polygon_guided_candidate_materialization:
+  status: review_only_not_authoritative
+  outward_uncertainty_tolerance_m: 0.05
+  existing_cube_soil_source: provenance_tracked_authoritative_soil_mask
+  expansion_cube_soil_source: validated_uninterpreted_scalar_index_review_rule
+  output_root_relative: data/processed/polygon_guided_mask_candidates
+  explicit_alley_precedence: true
+  tyre_tracks_change_labels: false
+  automatically_replace_authoritative_masks: false
+  automatically_retrain_models: false
