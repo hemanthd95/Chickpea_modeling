@@ -82,8 +82,12 @@ def source_root(paths: dict, row: pd.Series) -> Path:
 
 
 def product_array(path: Path, expected_shape: tuple[int, int]) -> tuple[np.ndarray | None, dict]:
-    result = {"read_status": "", "bands": 0, "dtype": "", "q01": np.nan,
-              "median": np.nan, "q99": np.nan, "plausible_ndvi_scale": False}
+    result = {
+        "read_status": "", "bands": 0, "dtype": "", "q01": np.nan,
+        "median": np.nan, "q99": np.nan, "plausible_ndvi_scale": False,
+        "finite_pixels": 0, "physical_ndvi_pixels": 0,
+        "below_minus_one_pixels": 0, "above_plus_one_pixels": 0,
+    }
     try:
         with rasterio.open(path) as dataset:
             result["bands"] = dataset.count
@@ -98,17 +102,34 @@ def product_array(path: Path, expected_shape: tuple[int, int]) -> tuple[np.ndarr
     except Exception as exc:
         result["read_status"] = f"read_error:{type(exc).__name__}:{exc}"
         return None, result
-    finite = array[np.isfinite(array)]
-    if finite.size == 0:
-        result["read_status"] = "no_finite_values"
+    finite_mask = np.isfinite(array)
+    result["finite_pixels"] = int(finite_mask.sum())
+    result["below_minus_one_pixels"] = int((finite_mask & (array < -1.0)).sum())
+    result["above_plus_one_pixels"] = int((finite_mask & (array > 1.0)).sum())
+
+    # NDVI is physically bounded by [-1, 1].  Spectronon exports in this
+    # project use -2.0 outside the observed raster footprint; it is a NoData
+    # sentinel, not evidence that the in-footprint NDVI scale is invalid.
+    physical_mask = finite_mask & (array >= -1.0) & (array <= 1.0)
+    physical = array[physical_mask]
+    result["physical_ndvi_pixels"] = int(physical.size)
+    if physical.size == 0:
+        result["read_status"] = "no_physical_ndvi_values"
         return None, result
-    q01, median, q99 = np.quantile(finite, [0.01, 0.50, 0.99])
-    result.update({"read_status": "readable", "q01": float(q01),
-                   "median": float(median), "q99": float(q99)})
-    # This is deliberately a plausibility gate, not an inferred rescaling rule.
-    plausible = bool(q01 >= -1.2 and q99 <= 1.2 and q99 > q01)
+    q01, median, q99 = np.quantile(physical, [0.01, 0.50, 0.99])
+    excluded = result["finite_pixels"] - result["physical_ndvi_pixels"]
+    result.update({
+        "read_status": (
+            "readable_with_out_of_domain_values_excluded"
+            if excluded else "readable"
+        ),
+        "q01": float(q01), "median": float(median), "q99": float(q99),
+    })
+    # This remains a plausibility gate, not an inferred rescaling rule.
+    plausible = bool(q01 >= -1.0 and q99 <= 1.0 and q99 > q01)
     result["plausible_ndvi_scale"] = plausible
-    return array, result
+    cleaned = np.where(physical_mask, array, np.nan).astype(np.float32)
+    return cleaned, result
 
 
 def agreement(reference: np.ndarray, candidate: np.ndarray, support: np.ndarray) -> dict:
@@ -336,7 +357,9 @@ def main() -> None:
         "soil_ndvi_threshold": threshold,
         "raw_reflectance_dn_ndvi_role": "diagnostic_only_not_accepted_for_soil_labels",
         "existing_soil_mask_role": "preferred_observed_soil_source_pending_audit_result",
-        "stored_ndvi_product_role": "candidate_requires_scale_and_alignment_validation",
+        "stored_ndvi_product_role": (
+            "physical_domain_filtered_candidate_compared_with_existing_soil_masks"
+        ),
         "label_expansion_cubes_without_soil_mask": "remain_unresolved_until_ndvi_product_is_validated",
         "authoritative_masks_modified": False,
         "models_retrained": False,
