@@ -290,3 +290,23 @@ shape and numeric scale, and compares any plausible product with existing soil
 masks. No unknown scaling is inferred. Cubes 12, 14, and 15 remain unresolved for
 soil until a stored NDVI product is validated because they do not have approved
 soil masks. No mask is changed and no model is retrained by this audit.
+
+
+## Stored NDVI threshold rejected; cross-cube separability audit staged
+
+After excluding the common -2.0 Spectronon NoData sentinel, all 18 stored
+one-band products were readable on the physical [-1, 1] domain. Nevertheless,
+their first-percentile values were 0.41–0.47 and the documented NDVI < 0.30 rule
+selected zero soil pixels in every cube. Agreement with all available
+provenance-tracked soil masks was therefore effectively zero. These products
+cannot be used as NDVI soil masks for Cubes 12, 14, or 15 under the documented
+threshold.
+
+A new read-only audit treats the stored value as an uninterpreted scalar index
+and tests whether it separates existing soil from non-soil consistently. A
+direction and cutoff are fitted on balanced samples from all but one primary
+cube and evaluated on the held-out cube. Cubes 24 and 28 are excluded from
+threshold fitting and retained only for sensitivity. A transferred rule is
+review-eligible only if mean leave-one-cube-out AUC is at least 0.75, balanced
+accuracy is at least 0.70, and the direction is stable. Even a passing rule does
+not automatically materialize a mask.
