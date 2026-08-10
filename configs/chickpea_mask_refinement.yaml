@@ -189,3 +189,20 @@ polygon_guided_vegetation_separability_audit:
   automatically_materialize_chickpea_or_weed_masks: false
   automatically_replace_authoritative_masks: false
   automatically_retrain_models: false
+
+# The weak historical chickpea/weed references failed cross-cube transfer
+# (mean LOCO AUC 0.5707; balanced accuracy 0.5462). Investigator-confirmed
+# points now replace those masks as the next spectral-reference source.
+investigator_vegetation_reference_annotation:
+  status: required_after_weak_reference_gate_failure
+  reference_types: [confirmed_chickpea, confirmed_weed, uncertain_do_not_use]
+  target_points_per_class_per_primary_cube: 10
+  default_sample_radius_m: 0.03
+  permitted_sample_radii_m: [0.00, 0.03, 0.05]
+  primary_candidate_cubes_only_for_model_fitting: true
+  label_expansion_cubes_are_projection_only: true
+  phenology_sensitivity_cubes_are_diagnostic_only: true
+  existing_row_and_planter_annotations_are_locked_context: true
+  historical_masks_are_not_reference_truth: true
+  automatically_materialize_masks: false
+  automatically_retrain_models: false

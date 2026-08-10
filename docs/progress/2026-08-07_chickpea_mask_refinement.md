@@ -343,3 +343,20 @@ primary cube at a time. Cubes 24 and 28 are excluded from reference fitting and
 remain sensitivity-only; Cubes 12, 14, and 15 receive projection scores only.
 The audit produces spectral curves, held-out metrics, and spatial score PNGs.
 It cannot write categorical masks or retrain a model.
+
+## Weak-reference gate result and clean point annotation
+
+A weak-reference chickpea-versus-weed audit was completed after polygon/soil
+materialization. The global spectral separator failed the frozen transfer gate:
+mean leave-one-cube-out AUC was 0.5707 and mean balanced accuracy was 0.5462.
+Scores clustered near 0.5 across all cubes. This demonstrates that historical
+chickpea and weed masks remain too contaminated to provide spectral truth; it
+does not demonstrate that the classes are intrinsically inseparable.
+
+A separate localhost vegetation-reference point annotator was therefore added.
+It reuses the already prepared NIR-red-green, PCA, derivative, NDVI, and
+historical-mask layers, while showing the investigator row polygons and planter
+footprints as locked context. The investigator marks only small, unmistakable
+chickpea or weed interiors (target: ten points per class per primary cube), with
+zoom and 0/3/5 cm sampling radii. It writes a new JSON/CSV/GeoJSON reference set
+and cannot alter the trusted row polygons, authoritative masks, or model inputs.
