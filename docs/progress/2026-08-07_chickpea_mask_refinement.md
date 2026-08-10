@@ -326,3 +326,20 @@ the frozen scalar-index rule, producing provisional soil fractions of 32.98%,
 spatial priors, explicit alleys take precedence, and a 0.05 m outward belt stays
 uncertain. Core non-soil is not yet chickpea: it remains pending observed
 weed-versus-chickpea separation. No authoritative mask or model input changes.
+
+## Polygon-guided vegetation separability audit staged
+
+The review-only materialization completed for all 19 annotated cubes. Across
+the polygon cores it preserves 696,057 soil pixels and 1,281,131 non-soil
+vegetation candidates; the latter are explicitly not assumed to be chickpea.
+Cubes 12, 14, and 15 use only the validated scalar-index soil rule, while all
+existing labeled cubes retain their provenance-tracked soil masks.
+
+Before any weed/chickpea relabeling, a fixed linear spectral audit now uses
+only pixels where the polygon-core non-soil layer agrees with an existing
+historical chickpea or weed label. These are weak audit references, not new
+ground truth. Cube-balanced samples are evaluated by leaving out one entire
+primary cube at a time. Cubes 24 and 28 are excluded from reference fitting and
+remain sensitivity-only; Cubes 12, 14, and 15 receive projection scores only.
+The audit produces spectral curves, held-out metrics, and spatial score PNGs.
+It cannot write categorical masks or retrain a model.

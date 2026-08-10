@@ -167,3 +167,25 @@ polygon_guided_candidate_materialization:
   tyre_tracks_change_labels: false
   automatically_replace_authoritative_masks: false
   automatically_retrain_models: false
+
+# Polygon and soil evidence define where vegetation may be evaluated; they do
+# not make every remaining pixel chickpea. Historical categorical labels are
+# used only as weak audit references where they agree with the polygon core.
+polygon_guided_vegetation_separability_audit:
+  spectral_band_section: primary
+  maximum_reference_pixels_per_class_per_cube: 5000
+  maximum_projection_pixels_per_cube_for_summary: 50000
+  prediction_chunk_size: 50000
+  seed: 42
+  logistic_regularization_c: 1.0
+  maximum_iterations: 500
+  minimum_mean_loco_auc: 0.75
+  minimum_mean_loco_balanced_accuracy: 0.70
+  minimum_fraction_heldout_cubes_passing_balanced_accuracy: 0.70
+  weak_reference_role: audit_only_not_ground_truth
+  sensitivity_cubes_are_reference_excluded: true
+  expansion_cubes_are_projection_only: true
+  write_probability_geotiffs: false
+  automatically_materialize_chickpea_or_weed_masks: false
+  automatically_replace_authoritative_masks: false
+  automatically_retrain_models: false

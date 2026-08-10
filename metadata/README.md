@@ -130,3 +130,11 @@ may be deleted and regenerated from the documented scripts.
 - `local/contracts/field1_polygon_guided_candidate_materialization_contract.yaml`:
   hashes candidate inputs and outputs while recording that authoritative masks
   and trained models were not changed.
+
+- `local/reports/mask_refinement/polygon_guided_vegetation_separability/`:
+  cube-balanced weak-reference spectra, leave-one-cube-out transfer metrics,
+  per-cube review-score summaries, and individual/all-cube PNG score maps. The
+  scores are diagnostics only and are never categorical chickpea labels.
+- `local/contracts/field1_polygon_guided_vegetation_separability_contract.yaml`:
+  records the frozen reference roles, transfer gate, band selection, and the
+  guarantee that no mask or supervised model changed.
