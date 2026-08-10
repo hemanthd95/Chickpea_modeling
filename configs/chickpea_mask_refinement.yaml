@@ -140,3 +140,16 @@ polygon_soil_source_audit:
   infer_unknown_ndvi_scaling: false
   label_expansion_cubes_without_validated_soil_source_remain_unresolved: true
   automatically_materialize_masks: false
+
+
+# The stored files named NDVI/NVDI contain no physical pixels below 0.30.
+# Treat their values as an uninterpreted index and accept a transferred soil
+# rule only if its direction and threshold generalize to held-out cubes.
+stored_index_soil_separability_audit:
+  maximum_sampled_pixels_per_class_per_cube: 20000
+  seed: 42
+  minimum_loco_auc: 0.75
+  minimum_loco_balanced_accuracy: 0.70
+  direction_must_be_stable: true
+  exclude_phenology_sensitivity_cubes_from_threshold_fitting: true
+  automatically_materialize_masks: false
