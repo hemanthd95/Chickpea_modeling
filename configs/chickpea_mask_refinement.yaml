@@ -114,3 +114,17 @@ chickpea_region_polygon_audit:
   clip_to_observed_raster_support: true
   explicit_alley_precedence: true
   automatically_materialize_masks: false
+
+# Frozen after investigator review of the polygon-versus-historical-mask QC.
+# The old mask is retained only for comparison and cannot rescue pixels outside
+# the investigator prior.
+polygon_guided_candidate_profile:
+  spatial_authority: investigator_chickpea_region_polygons
+  historical_chickpea_mask_role: comparison_only_not_a_veto
+  outward_uncertainty_tolerance_m: 0.05
+  soil_ndvi_threshold: 0.30
+  explicit_alley_precedence: true
+  tyre_tracks_change_labels: false
+  polygon_core_vegetation_status: candidate_pending_spectral_weed_separation
+  outward_edge_belt_status: uncertain_pending_stronger_spectral_evidence
+  automatically_materialize_masks: false
