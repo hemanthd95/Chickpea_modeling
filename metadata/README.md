@@ -98,3 +98,12 @@ may be deleted and regenerated from the documented scripts.
 - `local/contracts/field1_standardized_planter_turn_audit_contract.yaml`: immutable audit record for the standardized turn-band review; no masks or models are changed.
 
 - `local/annotations/planter_tracks/`: investigator-drawn tyre tracks, alley boundaries, and uncertain structures. The browser annotator saves JSON, vertex-level CSV, and GeoJSON; these are review evidence and never automatic class labels.
+
+- `local/annotations/chickpea_regions/`: investigator row-region polygons saved
+  as synchronized JSON, vertex CSV, and EPSG:32617 GeoJSON. These are uncertain
+  spatial eligibility priors, never direct chickpea labels.
+- `local/reports/mask_refinement/chickpea_region_annotation_qc/`: polygon export
+  reconciliation, normalized geometry QC, observed-footprint clipping, alley
+  overlap, 0–0.15 m edge-tolerance sensitivity, and per-cube/all-cube PNG review.
+- `local/contracts/field1_chickpea_region_annotation_qc_contract.yaml`: hashed
+  audit record confirming that no authoritative mask or model was changed.
