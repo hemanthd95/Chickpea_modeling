@@ -247,3 +247,22 @@ not create chickpea labels; they only define where later observed NDVI, row
 geometry, and conservative spectral evidence may be evaluated. The audit reports
 current chickpea pixels outside each tolerant prior and renders per-cube and
 all-cube PNGs. No mask is materialized until those diagnostics are reviewed.
+
+## Polygon-first authority accepted by investigator
+
+After reviewing the all-cube polygon QC, the investigator directed that the
+hand-drawn chickpea row polygons be trusted over the historical chickpea masks.
+At the 0.15 m audit tolerance, the historical mask retained only 68.63% of its
+primary-cube chickpea pixels; disagreements were particularly large in Cubes 35,
+40, 45, 47, and 54 and visually coincide with previously suspected weed noise.
+Historical magenta pixels outside the polygon prior therefore cannot be rescued
+automatically.
+
+The frozen next-stage policy is polygon-first but not polygon-equals-chickpea.
+Observed NoData and explicit alleys are excluded first. Within the polygon core,
+NDVI below 0.30 is provisionally soil; remaining vegetation is profiled using
+observed green, red, red-edge, and NIR features before a weed/chickpea separator
+is frozen. A 0.05 m outward belt is retained as uncertain and requires stronger
+spectral evidence. The old chickpea mask remains available solely for comparison.
+Cubes 24 and 28 remain sensitivity-only, and Cubes 12, 14, and 15 remain label-
+expansion candidates. No authoritative label changes during profiling.
