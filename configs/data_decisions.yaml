@@ -86,3 +86,19 @@ candidate_label_expansion:
     source: raw_spectronon_bip_mask
     status: human_review_required
     evidence: Strong chickpea signal with substantial weed contamination.
+
+chickpea_region_annotation_policy:
+  decision_date: 2026-08-10
+  investigator_decision: Trust hand-drawn chickpea row polygons over the historical chickpea masks.
+  primary_spatial_authority: investigator_chickpea_region_polygons
+  historical_chickpea_mask_role: comparison_only_not_a_veto
+  outside_polygon_policy: not_chickpea_unless_within_the_predeclared_uncertain_edge_belt
+  polygon_core_policy: spatially_eligible_only_not_an_automatic_chickpea_label
+  soil_rule: observed_ndvi_below_0.30
+  weed_rule: require_observed_spectral_evidence_after_soil_removal
+  uncertainty_edge_belt_m: 0.05
+  explicit_alley_precedence: true
+  tyre_track_policy: geometry_evidence_only_no_automatic_relabel
+  cubes_24_and_28: sensitivity_only
+  cubes_12_14_15: label_expansion_candidates
+  authoritative_masks_modified: false
