@@ -114,3 +114,10 @@ may be deleted and regenerated from the documented scripts.
 - `local/contracts/field1_polygon_guided_candidate_profile_contract.yaml`: hashes
   the polygon-first evidence profile before any spectral separator or mask is
   materialized.
+
+- `local/reports/mask_refinement/polygon_soil_source_audit/`: compares the
+  failed raw-band NDVI diagnostic with provenance-tracked soil masks and inventories
+  stored NDVI products inside investigator polygons. Unknown NDVI scaling is never
+  inferred, and label-expansion cubes remain unresolved without validated soil evidence.
+- `local/contracts/field1_polygon_soil_source_audit_contract.yaml`: hashes the
+  read-only soil-source audit and confirms that no label or model changed.
