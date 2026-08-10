@@ -266,3 +266,27 @@ is frozen. A 0.05 m outward belt is retained as uncertain and requires stronger
 spectral evidence. The old chickpea mask remains available solely for comparison.
 Cubes 24 and 28 remain sensitivity-only, and Cubes 12, 14, and 15 remain label-
 expansion candidates. No authoritative label changes during profiling.
+
+
+## Polygon spectral profile result and soil-source correction
+
+The polygon-first profile completed for all 19 annotated cubes. Investigator
+polygons provide useful spatial restriction and generally contain stronger NIR
+vegetation response than their outward edge belts and surrounding observations.
+The historical chickpea mask often has spectral distributions similar to, or
+worse than, the rest of the polygon core, so it remains comparison-only.
+
+The provisional direct NDVI calculation from stored 670 and 800 nm Pika-L values
+classified zero soil pixels in every polygon and every uncertain edge belt. This
+cannot be accepted as evidence that the polygons contain no soil: even observations
+outside the polygons had 5th-percentile NDVI around 0.47–0.55 and median NDVI
+around 0.63–0.75. The direct stored-value calculation therefore does not reproduce
+the investigator's original Spectronon NDVI < 0.30 soil workflow and is rejected
+as a label source.
+
+A read-only soil-source audit now intersects the provenance-tracked soil masks
+with the investigator polygons, inventories stored NDVI products, checks their
+shape and numeric scale, and compares any plausible product with existing soil
+masks. No unknown scaling is inferred. Cubes 12, 14, and 15 remain unresolved for
+soil until a stored NDVI product is validated because they do not have approved
+soil masks. No mask is changed and no model is retrained by this audit.
