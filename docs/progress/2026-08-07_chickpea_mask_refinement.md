@@ -211,3 +211,22 @@ The first footprint-impact audit stopped on a Cube 22 tyre outline because closi
 The annotation impact audit completed across 16 cubes. For the 14 primary-candidate cubes, 94,053 of 1,167,954 current chickpea pixels (8.05%) fall inside investigator-drawn alley footprints. The largest proposed corrections are Cube 40 (25,277 pixels; 29.91%), Cube 47 (22,728; 21.63%), and Cube 49 (12,563; 12.13%). Cubes 24 and 28 remain sensitivity-only and cannot enter refined primary training or evaluation.
 
 Tyre footprints are not safe direct removal masks: several magenta intersections visibly follow legitimate chickpea rows, including Cubes 35 and 45. A reversible materialization stage therefore applies only one rule: current chickpea inside an investigator-drawn alley becomes weed. Soil is unchanged, no chickpea is added, tyre annotations cause no class change, and all candidate products remain outside the authoritative manifest pending visual approval.
+
+
+## Chickpea-growing polygon annotation staged
+
+A separate localhost browser workflow now prepares aligned NIR-red-green, NDVI,
+standardized PCA, PCA first-difference, PCA second-difference, and current-mask
+overlay layers before collecting investigator polygons. The interface supports
+multiple chickpea-growing blocks, explicit non-chickpea exclusions, and uncertain
+boundaries per cube. Existing alley and tyre footprints appear only as locked
+reference overlays and cannot be overwritten by this annotation set.
+
+The review set contains every cube with a current chickpea mask plus Cubes 12,
+14, and 15 as label-expansion candidates. Cubes 24 and 28 remain visibly marked
+as phenology sensitivity cases. Polygons are spatial eligibility priors rather
+than pixel labels: no polygon can directly convert all enclosed pixels to
+chickpea. Subsequent candidates must separately remove soil using observed NDVI,
+apply row/planter geometry, and evaluate conservative observed spectral evidence.
+Ambiguous pixels remain uncertain. No authoritative mask or trained model is
+changed by either annotation script, and Field 2 remains locked.
