@@ -128,3 +128,15 @@ polygon_guided_candidate_profile:
   polygon_core_vegetation_status: candidate_pending_spectral_weed_separation
   outward_edge_belt_status: uncertain_pending_stronger_spectral_evidence
   automatically_materialize_masks: false
+
+# Direct (NIR-red)/(NIR+red) on the stored reflectance values produced no
+# soil anywhere, including outside the investigator polygons. It is retained
+# only as a diagnostic until the original NDVI source/scaling is reconciled.
+polygon_soil_source_audit:
+  soil_ndvi_threshold: 0.30
+  raw_reflectance_dn_ndvi_role: diagnostic_only_not_a_label_source
+  preferred_existing_source: provenance_tracked_soil_mask
+  inventory_stored_ndvi_products: true
+  infer_unknown_ndvi_scaling: false
+  label_expansion_cubes_without_validated_soil_source_remain_unresolved: true
+  automatically_materialize_masks: false
