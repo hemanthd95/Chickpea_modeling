@@ -230,3 +230,20 @@ chickpea. Subsequent candidates must separately remove soil using observed NDVI,
 apply row/planter geometry, and evaluate conservative observed spectral evidence.
 Ambiguous pixels remain uncertain. No authoritative mask or trained model is
 changed by either annotation script, and Field 2 remains locked.
+
+## Investigator chickpea-region annotations received
+
+The investigator completed all 19 cubes, including optional label-expansion
+Cubes 12, 14, and 15. The synchronized JSON, vertex CSV, and EPSG:32617 GeoJSON
+exports contain 413 row-region polygons and 2,068 vertices; all annotation IDs,
+vertex counts, coordinates, cube IDs, and analysis roles reconcile exactly.
+
+Because chickpea rows are narrow, polygon edges are explicitly treated as
+uncertain measurements rather than exact class boundaries. A non-destructive
+audit normalizes only centimetre-scale closing seams (maximum 0.30 m), evaluates
+outward tolerances of 0, 0.05, 0.10, and 0.15 m, clips regions to observed raster
+support, and gives investigator-drawn alleys precedence. Oversized polygons do
+not create chickpea labels; they only define where later observed NDVI, row
+geometry, and conservative spectral evidence may be evaluated. The audit reports
+current chickpea pixels outside each tolerant prior and renders per-cube and
+all-cube PNGs. No mask is materialized until those diagnostics are reviewed.
