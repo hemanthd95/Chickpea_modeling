@@ -94,7 +94,8 @@ chickpea_region_annotation_policy:
   historical_chickpea_mask_role: comparison_only_not_a_veto
   outside_polygon_policy: not_chickpea_unless_within_the_predeclared_uncertain_edge_belt
   polygon_core_policy: spatially_eligible_only_not_an_automatic_chickpea_label
-  soil_rule: observed_ndvi_below_0.30
+  soil_rule: ndvi_below_0.30_only_from_a_validated_ndvi_product_or_provenance_tracked_soil_mask
+  raw_reflectance_dn_ndvi_status: rejected_as_label_source_after_zero_soil_result_across_all_19_polygon_cubes
   weed_rule: require_observed_spectral_evidence_after_soil_removal
   uncertainty_edge_belt_m: 0.05
   explicit_alley_precedence: true
