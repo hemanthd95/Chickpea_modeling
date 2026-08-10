@@ -104,3 +104,13 @@ planter_pass_reconstruction:
     - turn_arc_candidates
     - numbered_six_row_passes
     - overlap_deduplicated_pass_map
+
+# Investigator row polygons are spatial eligibility priors, not exact class
+# boundaries. These tolerances are audited before any refined mask is written.
+chickpea_region_polygon_audit:
+  seam_snap_maximum_m: 0.30
+  outward_edge_tolerance_candidates_m: [0.00, 0.05, 0.10, 0.15]
+  visual_review_tolerance_m: 0.15
+  clip_to_observed_raster_support: true
+  explicit_alley_precedence: true
+  automatically_materialize_masks: false
