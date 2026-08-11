@@ -380,3 +380,12 @@ non-soil support and weed centres must fall outside that core. The separator is
 then evaluated by leaving out a whole primary cube at a time. Cubes 24 and 28
 remain sensitivity-only, Cubes 12/14/15 remain projection-only, historical
 chickpea/weed masks are not used as truth, and no categorical mask is written.
+
+### Investigator-reference post-QC support rule
+
+- Fixed empty categorical cube/class combinations being reported as `NaN`
+  deficits instead of zero-count combinations.
+- Kept the annotation design target at 10 points per class per primary cube.
+- Set the post-spectral-QC execution minimum to 5 usable points per class per
+  cube. This permits Cube 20's seven confirmed-weed references to enter the
+  diagnostic without weakening the frozen LOCO performance gates.

@@ -199,6 +199,9 @@ def main() -> None:
         raise ValueError("Confirmed references must be on primary cubes only")
 
     minimum_points = int(policy["minimum_points_per_class_per_primary_cube"])
+    minimum_usable_points = int(
+        policy.get("minimum_usable_points_per_class_per_primary_cube", minimum_points)
+    )
     counts = annotations.groupby(["cube_id", "kind"]).size().unstack(fill_value=0)
     if (counts.reindex(columns=list(LABELS), fill_value=0) < minimum_points).any().any():
         raise ValueError("At least one cube/class has too few investigator points")
@@ -337,18 +340,23 @@ def main() -> None:
     point_qc = pd.DataFrame(point_rows)
     usable_counts = (
         point_qc[point_qc["usable_reference"]]
-        .groupby(["cube_id", "kind"]).size().unstack(fill_value=0)
+        .groupby(["cube_id", "kind"], observed=True).size().unstack(fill_value=0)
         .reindex(index=primary, columns=list(LABELS), fill_value=0)
+        .fillna(0)
+        .astype(int)
     )
-    if (usable_counts < minimum_points).any().any():
-        deficient = usable_counts[usable_counts < minimum_points].stack()
+    if (usable_counts < minimum_usable_points).any().any():
+        deficient = usable_counts[
+            usable_counts < minimum_usable_points
+        ].stack()
         bad = point_qc.loc[
             ~point_qc["usable_reference"], "annotation_id"
         ].tolist()
         raise ValueError(
             "Too few usable references remain in at least one cube/class after "
             "observed non-soil spectral QC; deficient counts="
-            f"{deficient.to_dict()}; rejected IDs begin: {bad[:5]}"
+            f"{deficient.to_dict()}; required minimum={minimum_usable_points}; "
+            f"rejected IDs begin: {bad[:5]}"
         )
     features = np.stack(spectra)
     target = np.asarray(labels, dtype=np.uint8)

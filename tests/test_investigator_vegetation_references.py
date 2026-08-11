@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from affine import Affine
 
 from scripts.audit_investigator_vegetation_references import (
@@ -37,3 +38,27 @@ def test_reference_usability_depends_on_spectral_support_not_geometry_flags():
     assert not reference_is_usable(
         spectrum, {"usable_nonsoil_pixels": 2}, True, 3
     )
+
+
+def test_usable_count_table_has_zero_not_nan_for_missing_categories():
+    frame = pd.DataFrame({
+        "cube_id": ["field1_cube20"] * 7,
+        "kind": pd.Categorical(
+            ["confirmed_weed"] * 7,
+            categories=["confirmed_weed", "confirmed_chickpea"],
+        ),
+    })
+    counts = (
+        frame.groupby(["cube_id", "kind"], observed=True)
+        .size()
+        .unstack(fill_value=0)
+        .reindex(
+            index=["field1_cube20"],
+            columns=["confirmed_weed", "confirmed_chickpea"],
+            fill_value=0,
+        )
+        .fillna(0)
+        .astype(int)
+    )
+    assert counts.loc["field1_cube20", "confirmed_weed"] == 7
+    assert counts.loc["field1_cube20", "confirmed_chickpea"] == 0

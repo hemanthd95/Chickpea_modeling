@@ -213,6 +213,7 @@ investigator_vegetation_reference_annotation:
 investigator_vegetation_reference_audit:
   spectral_band_section: primary
   minimum_points_per_class_per_primary_cube: 10
+  minimum_usable_points_per_class_per_primary_cube: 5
   minimum_usable_pixels_per_reference: 3
   logistic_regularization_c: 1.0
   maximum_iterations: 1000
