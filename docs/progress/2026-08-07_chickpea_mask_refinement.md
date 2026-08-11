@@ -442,3 +442,21 @@ chickpea/weed masks are not used as truth, and no categorical mask is written.
   the 5 cm polygon edge stays unresolved; Cube 32 is forced unresolved; cubes
   12/14/15 and 24/28 remain diagnostic-only. No authoritative mask or model
   input changes until the resulting maps receive explicit visual acceptance.
+
+## Incomplete-positive polygon semantics and trusted expansion cubes
+
+- The investigator clarified that the hand-drawn row polygons intentionally
+  omit some small or difficult chickpea patches. They are therefore trusted
+  positive-support regions, not exhaustive presence/absence masks. Pixels
+  outside every polygon remain unknown and cannot be converted to weed or used
+  as evidence of chickpea absence.
+- Cubes 12, 14, and 15 are now accepted as trusted investigator positive
+  support because their chickpea rows were planted earlier, show strong growth,
+  and were drawn with high investigator confidence.
+- For these three cubes, only polygon-core, non-soil pixels with
+  P(chickpea) >= 0.80 may enter the review layer as chickpea candidates.
+  P(chickpea) <= 0.15 does not create weed candidates because no local weed
+  reference points were collected for these cubes. All remaining vegetation,
+  polygon edges, alleys, and unmarked areas stay unresolved.
+- This expands conservative chickpea support without claiming exhaustive
+  coverage, changing an authoritative mask, or retraining a model.

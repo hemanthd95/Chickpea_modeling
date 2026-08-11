@@ -62,7 +62,8 @@ def build_review_candidate(
     probability: np.ndarray,
     weed_threshold: float,
     chickpea_threshold: float,
-    decision_eligible: bool,
+    weed_decision_eligible: bool,
+    chickpea_decision_eligible: bool | None = None,
 ) -> np.ndarray:
     """Combine frozen support and probability evidence into review codes."""
     if support.shape != probability.shape:
@@ -79,8 +80,11 @@ def build_review_candidate(
     core = support == 2
     result[core] = 3
     valid_probability = np.isfinite(probability) & (probability >= 0) & (probability <= 1)
-    if decision_eligible:
+    if chickpea_decision_eligible is None:
+        chickpea_decision_eligible = weed_decision_eligible
+    if weed_decision_eligible:
         result[core & valid_probability & (probability <= weed_threshold)] = 2
+    if chickpea_decision_eligible:
         result[core & valid_probability & (probability >= chickpea_threshold)] = 4
     return result
 
@@ -188,7 +192,12 @@ def main() -> None:
     warning_cubes = {
         str(value) for value in threshold_contract.get("transfer_warning_cubes", [])
     }
-    eligible_roles = {str(value) for value in policy["decision_eligible_roles"]}
+    chickpea_eligible_roles = {
+        str(value) for value in policy["chickpea_decision_eligible_roles"]
+    }
+    weed_eligible_roles = {
+        str(value) for value in policy["weed_decision_eligible_roles"]
+    }
     summary_rows: list[dict] = []
     output_paths: list[Path] = []
     source_hashes: dict[str, str] = {}
@@ -201,7 +210,9 @@ def main() -> None:
         cube_id = str(row.cube_id)
         role = str(row.analysis_role)
         warning = cube_id in warning_cubes or true_value(row.transfer_warning)
-        decision_eligible = role in eligible_roles and not warning
+        chickpea_decision_eligible = role in chickpea_eligible_roles and not warning
+        weed_decision_eligible = role in weed_eligible_roles and not warning
+        decision_eligible = chickpea_decision_eligible or weed_decision_eligible
         probability_path = Path(str(row.probability_path))
         validate_output_hash(probability_contract, project, probability_path)
         support_path = support_root / cube_id / "polygon_guided_candidate_support.tif"
@@ -219,7 +230,12 @@ def main() -> None:
                 raise ValueError(f"Probability/support georeferencing mismatch for {cube_id}")
 
         review = build_review_candidate(
-            support, probability, weed_threshold, chickpea_threshold, decision_eligible
+            support,
+            probability,
+            weed_threshold,
+            chickpea_threshold,
+            weed_decision_eligible,
+            chickpea_decision_eligible,
         )
         cube_root = output_root / cube_id
         cube_root.mkdir(parents=True, exist_ok=True)
@@ -230,6 +246,8 @@ def main() -> None:
             dataset.update_tags(
                 status="review_only_not_authoritative",
                 decision_eligible=str(decision_eligible).lower(),
+                chickpea_decision_eligible=str(chickpea_decision_eligible).lower(),
+                weed_decision_eligible=str(weed_decision_eligible).lower(),
                 analysis_role=role,
                 transfer_warning=str(warning).lower(),
                 weed_maximum_probability=f"{weed_threshold:.6f}",
@@ -257,9 +275,15 @@ def main() -> None:
             "analysis_role": role,
             "transfer_warning": warning,
             "decision_eligible": decision_eligible,
+            "chickpea_decision_eligible": chickpea_decision_eligible,
+            "weed_decision_eligible": weed_decision_eligible,
             "candidate_disposition": (
-                "primary_visual_review_candidate" if decision_eligible
-                else "diagnostic_only_or_forced_unresolved"
+                "trusted_expansion_chickpea_review_candidate"
+                if role == "label_expansion_candidate" and chickpea_decision_eligible
+                else (
+                    "primary_visual_review_candidate" if decision_eligible
+                    else "diagnostic_only_or_forced_unresolved"
+                )
             ),
             "core_soil_pixels": counts[1],
             "high_confidence_weed_review_pixels": counts[2],
@@ -305,7 +329,15 @@ def main() -> None:
     output_paths.append(summary_path)
 
     role_summary = (
-        summary.groupby(["analysis_role", "decision_eligible"], dropna=False)
+        summary.groupby(
+            [
+                "analysis_role",
+                "decision_eligible",
+                "chickpea_decision_eligible",
+                "weed_decision_eligible",
+            ],
+            dropna=False,
+        )
         [[
             "core_soil_pixels", "high_confidence_weed_review_pixels",
             "unresolved_core_vegetation_pixels",
@@ -326,7 +358,14 @@ def main() -> None:
         axis.set_facecolor("black")
     for axis, (cube_id, role, warning, eligible, tile, counts) in zip(flat, overview):
         axis.imshow(tile, cmap=CMAP, norm=NORM, interpolation="nearest")
-        qualifier = "PRIMARY REVIEW" if eligible else ("TRANSFER WARNING" if warning else "DIAGNOSTIC ONLY")
+        qualifier = (
+            "TRUSTED EXPANSION REVIEW"
+            if role == "label_expansion_candidate" and eligible
+            else (
+                "PRIMARY REVIEW" if eligible
+                else ("TRANSFER WARNING" if warning else "DIAGNOSTIC ONLY")
+            )
+        )
         axis.set_title(
             f"{cube_id} | {qualifier}\nW {counts[2]:,} | U {counts[3]:,} | C {counts[4]:,}",
             color="#B91C1C" if warning else "black", fontsize=8,
@@ -342,17 +381,20 @@ def main() -> None:
     plt.close(figure)
     output_paths.append(overview_path)
 
-    primary = summary[summary["decision_eligible"]]
+    eligible = summary[summary["decision_eligible"]]
     contract = {
         "status": "field1_investigator_mask_review_candidates_materialized",
         "field": "Field 1",
         "class_legend": CLASS_NAMES,
         "weed_maximum_probability": weed_threshold,
         "chickpea_minimum_probability": chickpea_threshold,
-        "decision_eligible_roles": sorted(eligible_roles),
-        "decision_eligible_cubes": sorted(primary["cube_id"].astype(str).tolist()),
+        "chickpea_decision_eligible_roles": sorted(chickpea_eligible_roles),
+        "weed_decision_eligible_roles": sorted(weed_eligible_roles),
+        "decision_eligible_cubes": sorted(eligible["cube_id"].astype(str).tolist()),
         "transfer_warning_cubes_forced_unresolved": sorted(warning_cubes),
-        "nonprimary_cubes_are_diagnostic_only": True,
+        "trusted_expansion_cubes_are_chickpea_only": True,
+        "outside_polygon_pixels_are_unknown_unlabeled": True,
+        "nondecision_eligible_cubes_are_diagnostic_only": True,
         "polygon_edges_are_unresolved": True,
         "candidate_geotiffs_are_authoritative": False,
         "visual_acceptance_completed": False,
@@ -375,7 +417,7 @@ def main() -> None:
 
     print("\nReview-candidate support by role:")
     print(role_summary.to_string(index=False))
-    print(f"Decision-eligible primary cubes: {len(primary)}")
+    print(f"Decision-eligible cubes: {len(eligible)}")
     print(f"Review-only GeoTIFF root: {output_root}")
     print(f"Summary: {summary_path}")
     print(f"Visual QC: {overview_path}")

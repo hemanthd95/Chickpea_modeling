@@ -19,6 +19,17 @@ def test_warning_cube_forces_core_vegetation_unresolved():
     assert result.tolist() == [[3, 3, 3]]
 
 
+def test_trusted_expansion_cube_materializes_chickpea_only():
+    support = np.asarray([[2, 2, 2]], dtype=np.uint8)
+    probability = np.asarray([[0.01, 0.50, 0.99]], dtype=float)
+    result = build_review_candidate(
+        support, probability, 0.15, 0.80,
+        weed_decision_eligible=False,
+        chickpea_decision_eligible=True,
+    )
+    assert result.tolist() == [[3, 3, 4]]
+
+
 def test_invalid_threshold_order_is_rejected():
     support = np.asarray([[2]], dtype=np.uint8)
     probability = np.asarray([[0.5]], dtype=float)

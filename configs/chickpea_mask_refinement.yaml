@@ -53,9 +53,9 @@ investigator_guidance:
       retain_for: [immutable_inventory, sensitivity_analysis]
   optional_mask_expansion:
     cubes: [field1_cube12, field1_cube14, field1_cube15]
-    source: raw_spectronon_bip_masks
-    status: human_review_required
-    note: Chickpea signal is strong but weed contamination is substantial; never admit automatically.
+    source: investigator_hand_drawn_chickpea_region_polygons
+    status: trusted_investigator_positive_support_incomplete_coverage
+    note: Investigator is fully confident in the marked chickpea rows and reports strong chickpea growth from earlier planting. Polygons intentionally omit small or difficult chickpea patches, so outside-polygon pixels remain unknown rather than negative.
 
 planter_pass_reconstruction:
   status: geometry_evidence_audit_ready
@@ -120,6 +120,8 @@ chickpea_region_polygon_audit:
 # the investigator prior.
 polygon_guided_candidate_profile:
   spatial_authority: investigator_chickpea_region_polygons
+  polygon_coverage_semantics: trusted_positive_support_incomplete_by_design
+  outside_polygon_policy: unknown_unlabeled_not_negative
   historical_chickpea_mask_role: comparison_only_not_a_veto
   outward_uncertainty_tolerance_m: 0.05
   soil_ndvi_threshold: 0.30
@@ -307,7 +309,10 @@ investigator_mask_review_candidate:
   probability_contract_filename: field1_investigator_chickpea_probability_review_contract.yaml
   candidate_contract_filename: field1_polygon_guided_candidate_materialization_contract.yaml
   output_root_relative: data/processed/investigator_mask_review_candidates
-  decision_eligible_roles: [primary_candidate]
+  chickpea_decision_eligible_roles: [primary_candidate, label_expansion_candidate]
+  weed_decision_eligible_roles: [primary_candidate]
+  incomplete_positive_support_cubes: [field1_cube12, field1_cube14, field1_cube15]
+  outside_polygon_action: unresolved_not_negative
   weed_maximum_probability: 0.15
   chickpea_minimum_probability: 0.80
   polygon_edge_action: unresolved
