@@ -180,3 +180,10 @@ alleys retain precedence, polygon edges remain unresolved, Cube 32 is forced
 unresolved because of its frozen transfer warning, and non-primary cubes are
 diagnostic-only. The layers cannot replace authoritative masks without a later
 visual-acceptance and freeze step.
+
+`scripts/build_investigator_mask_acceptance_previews.py` performs that next
+non-destructive visual-QC stage. It overlays proposed decisions and unresolved
+support on the observed NIR-red-green annotation imagery, writes one detailed
+panel per cube plus a dedicated cubes 12/14/15 comparison, and initializes an
+acceptance inventory with every cube still pending. It does not accept or
+replace any mask.

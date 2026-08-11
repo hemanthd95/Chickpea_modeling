@@ -322,3 +322,17 @@ investigator_mask_review_candidate:
   automatically_accept_review_candidates: false
   automatically_replace_authoritative_masks: false
   automatically_retrain_models: false
+
+# Before any review code can become a training label, render it directly over
+# the same observed NIR-red-green imagery used for investigator annotation.
+# The generated inventory starts with every cube pending visual acceptance.
+investigator_mask_acceptance_review:
+  status: enabled_after_review_candidate_materialization
+  candidate_contract_filename: field1_investigator_mask_review_candidate_contract.yaml
+  annotation_layer_manifest_relative: metadata/local/reports/chickpea_region_annotation/chickpea_region_annotation_layer_manifest.csv
+  trusted_expansion_cubes: [field1_cube12, field1_cube14, field1_cube15]
+  decision_overlay_alpha: 0.72
+  uncertainty_overlay_alpha: 0.68
+  automatically_accept_review_candidates: false
+  automatically_replace_authoritative_masks: false
+  automatically_retrain_models: false

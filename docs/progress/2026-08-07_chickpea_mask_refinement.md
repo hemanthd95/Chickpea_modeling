@@ -460,3 +460,18 @@ chickpea/weed masks are not used as truth, and no categorical mask is written.
   polygon edges, alleys, and unmarked areas stay unresolved.
 - This expands conservative chickpea support without claiming exhaustive
   coverage, changing an authoritative mask, or retraining a model.
+
+## Imagery-backed visual acceptance staged
+
+- The all-cube categorical montage is useful for support accounting but is too
+  compressed to accept pixel decisions. A separate acceptance-preview script
+  now aligns every review GeoTIFF to the original NIR-red-green annotation
+  layer and renders observed imagery, proposed decisions, and unresolved
+  support side by side.
+- Cubes 12/14/15 receive a dedicated high-resolution comparison. Their trusted
+  polygons remain incomplete positive support: only high-confidence chickpea
+  decisions are shown, no weed decisions are inferred, and unmarked areas stay
+  unknown.
+- Every acceptance-inventory row begins as
+  `pending_investigator_visual_acceptance`. The script cannot change an
+  authoritative mask, train a model, or access Field 2.
