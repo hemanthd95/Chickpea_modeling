@@ -168,3 +168,7 @@ PNG QC are stored under
 with a provenance contract in `metadata/local/contracts/`. These probabilities
 are not categorical masks and cannot enter training without a separate review
 and freeze step.
+The investigator probability threshold audit is stored under
+`metadata/local/reports/mask_refinement/investigator_chickpea_probability_review/threshold_audit/`.
+It presents conservative chickpea/weed review thresholds and an unresolved
+middle class; these outputs are diagnostics and are not authoritative masks.
