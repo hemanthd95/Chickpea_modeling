@@ -389,3 +389,14 @@ chickpea/weed masks are not used as truth, and no categorical mask is written.
 - Set the post-spectral-QC execution minimum to 5 usable points per class per
   cube. This permits Cube 20's seven confirmed-weed references to enter the
   diagnostic without weakening the frozen LOCO performance gates.
+
+### Investigator-reference transfer gate passed
+
+- The corrected audit retained 348 of 354 investigator points.
+- Mean leave-one-cube-out ROC AUC was 0.9556 and mean balanced accuracy was
+  0.9115, compared with 0.5707 and 0.5462 from the historical weak references.
+- Thirteen of fourteen held-out primary cubes exceeded the 0.70 balanced-
+  accuracy gate. Cube 32 remains an explicit transfer warning (AUC 0.6154;
+  balanced accuracy 0.5769) and is not removed from the evidence.
+- The next action is contract materialization. No categorical mask is accepted
+  and no supervised model is retrained at this stage.

@@ -230,3 +230,27 @@ investigator_vegetation_reference_audit:
   write_probability_geotiffs: false
   automatically_materialize_masks: false
   automatically_retrain_models: false
+
+# Freeze only after the investigator-point audit passes its predeclared
+# cross-cube transfer gates. Per-cube failures remain explicit diagnostics and
+# are never silently removed from the accepted reference evidence.
+investigator_vegetation_reference_freeze:
+  status: accepted_pending_contract_materialization
+  source_report_relative: reports/mask_refinement/investigator_vegetation_reference_audit
+  audit_contract_filename: field1_investigator_vegetation_reference_audit_contract.yaml
+  frozen_contract_filename: field1_investigator_vegetation_reference_contract.yaml
+  frozen_points_filename: field1_investigator_vegetation_reference_points.csv
+  frozen_qc_filename: field1_investigator_vegetation_reference_qc.csv
+  frozen_loco_filename: field1_investigator_vegetation_reference_loco_validation.csv
+  frozen_spectral_profile_filename: field1_investigator_vegetation_reference_spectral_profile.csv
+  frozen_visual_filename: field1_investigator_vegetation_reference_overview.png
+  minimum_usable_points_per_class_per_cube: 5
+  minimum_mean_loco_auc: 0.75
+  minimum_mean_loco_balanced_accuracy: 0.70
+  minimum_fraction_heldout_cubes_passing_balanced_accuracy: 0.70
+  per_cube_balanced_accuracy_warning_threshold: 0.70
+  per_cube_auc_warning_threshold: 0.75
+  downstream_use: polygon_constrained_probability_review_only
+  automatically_materialize_categorical_masks: false
+  automatically_replace_authoritative_masks: false
+  automatically_retrain_models: false
