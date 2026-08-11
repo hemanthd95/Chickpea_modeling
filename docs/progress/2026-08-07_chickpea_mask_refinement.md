@@ -419,3 +419,14 @@ chickpea/weed masks are not used as truth, and no categorical mask is written.
   writer now converts NumPy scalar values to native Python types and provides
   `--finalize-only` to verify completed outputs and write the contract without
   repeating dense spectral scoring.
+## Investigator-probability threshold audit
+
+- Added a conservative three-way threshold audit for the finalized continuous
+  probability rasters: high-confidence weed, unresolved, and high-confidence
+  chickpea.
+- Threshold precision and recall are measured from genuinely held-out
+  investigator points. Dense candidate maps remain review evidence because
+  point-level precision is not automatically dense-pixel precision.
+- The audit writes CSV diagnostics and visual previews only. It cannot write a
+  categorical GeoTIFF, modify an authoritative mask, retrain a model, or open
+  Field 2.
