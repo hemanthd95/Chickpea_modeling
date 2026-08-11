@@ -336,3 +336,21 @@ investigator_mask_acceptance_review:
   automatically_accept_review_candidates: false
   automatically_replace_authoritative_masks: false
   automatically_retrain_models: false
+
+# Investigator visual acceptance applies only to conservative positive support
+# in the trusted expansion cubes. Value 1 means confirmed chickpea support;
+# value 0 remains unknown/unlabeled and must never be interpreted as non-crop.
+trusted_expansion_chickpea_freeze:
+  status: investigator_accepted_after_imagery_review
+  acceptance_contract_filename: field1_investigator_mask_acceptance_review_contract.yaml
+  candidate_contract_filename: field1_investigator_mask_review_candidate_contract.yaml
+  accepted_cubes: [field1_cube12, field1_cube14, field1_cube15]
+  accepted_review_code: 4
+  positive_support_value: 1
+  unknown_unlabeled_value: 0
+  output_root_relative: data/processed/trusted_expansion_chickpea_positive_support
+  outside_polygon_action: unknown_unlabeled
+  unresolved_pixel_action: unknown_unlabeled
+  infer_weed_labels: false
+  replace_authoritative_masks: false
+  retrain_models: false

@@ -475,3 +475,13 @@ chickpea/weed masks are not used as truth, and no categorical mask is written.
 - Every acceptance-inventory row begins as
   `pending_investigator_visual_acceptance`. The script cannot change an
   authoritative mask, train a model, or access Field 2.
+
+## Trusted expansion positive support accepted
+
+- Investigator review accepted only the high-confidence chickpea proposals in
+  cubes 12, 14, and 15 after comparison with the observed false-colour imagery.
+- The accepted layer is supplemental positive support, not a complete binary
+  mask: value 1 is confirmed chickpea evidence and value 0 is unknown/unlabeled.
+- Omitted polygon areas and all unresolved pixels remain unknown. No weed or
+  negative label is inferred, existing authoritative masks are not replaced,
+  and the remaining primary cubes still require individual visual review.

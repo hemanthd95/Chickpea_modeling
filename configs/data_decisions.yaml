@@ -87,6 +87,16 @@ candidate_label_expansion:
     status: trusted_positive_support_incomplete_coverage
     evidence: Investigator-confirmed chickpea rows with strong growth from earlier planting; omitted small patches remain unknown.
 
+trusted_expansion_visual_acceptance:
+  decision_date: 2026-08-11
+  accepted_cubes: [field1_cube12, field1_cube14, field1_cube15]
+  accepted_content: high_confidence_chickpea_positive_support_only
+  evidence: Investigator-trusted row polygons, held-out point threshold precision, and imagery-backed side-by-side acceptance review.
+  outside_polygon_semantics: unknown_unlabeled_not_negative
+  unresolved_semantics: withheld_from_training_labels
+  weed_labels_inferred: false
+  existing_authoritative_masks_replaced: false
+
 chickpea_region_annotation_policy:
   decision_date: 2026-08-10
   investigator_decision: Trust hand-drawn chickpea row polygons over the historical chickpea masks.

@@ -187,3 +187,9 @@ support on the observed NIR-red-green annotation imagery, writes one detailed
 panel per cube plus a dedicated cubes 12/14/15 comparison, and initializes an
 acceptance inventory with every cube still pending. It does not accept or
 replace any mask.
+
+`scripts/freeze_trusted_expansion_chickpea_support.py` freezes the visually
+accepted high-confidence chickpea pixels for cubes 12/14/15 as supplemental
+positive-only GeoTIFFs. Their zero value explicitly means unknown/unlabeled,
+not weed, soil, or chickpea absence. This stage does not replace the existing
+authoritative masks or retrain any model.
