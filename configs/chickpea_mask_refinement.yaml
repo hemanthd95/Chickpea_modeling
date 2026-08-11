@@ -297,3 +297,23 @@ investigator_probability_threshold_audit:
   automatically_materialize_masks: false
   automatically_replace_authoritative_masks: false
   automatically_retrain_models: false
+
+# Materialize the accepted threshold audit as an explicitly review-only layer.
+# Soil and alleys preserve precedence, polygon-edge pixels remain unresolved,
+# and any frozen transfer-warning cube is barred from automatic decisions.
+investigator_mask_review_candidate:
+  status: enabled_after_threshold_audit_gate
+  threshold_contract_filename: field1_investigator_probability_threshold_audit_contract.yaml
+  probability_contract_filename: field1_investigator_chickpea_probability_review_contract.yaml
+  candidate_contract_filename: field1_polygon_guided_candidate_materialization_contract.yaml
+  output_root_relative: data/processed/investigator_mask_review_candidates
+  decision_eligible_roles: [primary_candidate]
+  weed_maximum_probability: 0.15
+  chickpea_minimum_probability: 0.80
+  polygon_edge_action: unresolved
+  transfer_warning_action: unresolved
+  nonprimary_role_action: diagnostic_only
+  write_review_only_geotiffs: true
+  automatically_accept_review_candidates: false
+  automatically_replace_authoritative_masks: false
+  automatically_retrain_models: false
