@@ -360,3 +360,14 @@ footprints as locked context. The investigator marks only small, unmistakable
 chickpea or weed interiors (target: ten points per class per primary cube), with
 zoom and 0/3/5 cm sampling radii. It writes a new JSON/CSV/GeoJSON reference set
 and cannot alter the trusted row polygons, authoritative masks, or model inputs.
+
+## Investigator reference spectral audit staged
+
+The next read-only audit treats every investigator point as one independent
+reference observation. Its 0/3/5 cm neighbourhood is sampled in map space;
+soil, nonfinite, and unobserved pixels are removed; and the remaining spectra
+are reduced to one bandwise median. Chickpea centres must fall in polygon-core
+non-soil support and weed centres must fall outside that core. The separator is
+then evaluated by leaving out a whole primary cube at a time. Cubes 24 and 28
+remain sensitivity-only, Cubes 12/14/15 remain projection-only, historical
+chickpea/weed masks are not used as truth, and no categorical mask is written.

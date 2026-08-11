@@ -206,3 +206,24 @@ investigator_vegetation_reference_annotation:
   historical_masks_are_not_reference_truth: true
   automatically_materialize_masks: false
   automatically_retrain_models: false
+
+# Each investigator point is one independent reference observation. Spectra
+# within its circle are filtered for soil/NoData and reduced to a bandwise
+# median before leave-one-cube-out validation.
+investigator_vegetation_reference_audit:
+  spectral_band_section: primary
+  minimum_points_per_class_per_primary_cube: 10
+  minimum_usable_pixels_per_reference: 3
+  logistic_regularization_c: 1.0
+  maximum_iterations: 1000
+  seed: 42
+  minimum_mean_loco_auc: 0.75
+  minimum_mean_loco_balanced_accuracy: 0.70
+  minimum_fraction_heldout_cubes_passing_balanced_accuracy: 0.70
+  chickpea_centres_must_be_polygon_core_nonsoil: true
+  weed_centres_must_be_outside_chickpea_core: true
+  exclude_soil_and_nodata_pixels_before_aggregation: true
+  historical_chickpea_and_weed_masks_are_not_reference_truth: true
+  write_probability_geotiffs: false
+  automatically_materialize_masks: false
+  automatically_retrain_models: false
