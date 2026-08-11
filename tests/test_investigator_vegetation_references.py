@@ -4,6 +4,7 @@ from affine import Affine
 from scripts.audit_investigator_vegetation_references import (
     aggregate_reference_spectrum,
     disk_indices,
+    reference_is_usable,
 )
 
 
@@ -26,3 +27,13 @@ def test_aggregate_excludes_soil_and_nodata_and_returns_one_median():
     assert qc["usable_nonsoil_pixels"] == 2
     assert qc["soil_pixels"] == 1
     assert qc["nodata_or_nonfinite_pixels"] == 2
+
+
+def test_reference_usability_depends_on_spectral_support_not_geometry_flags():
+    spectrum = np.asarray([1, 2], dtype=np.float32)
+    qc = {"usable_nonsoil_pixels": 4}
+    assert reference_is_usable(spectrum, qc, True, 3)
+    assert not reference_is_usable(spectrum, qc, False, 3)
+    assert not reference_is_usable(
+        spectrum, {"usable_nonsoil_pixels": 2}, True, 3
+    )

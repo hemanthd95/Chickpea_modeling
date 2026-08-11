@@ -220,8 +220,10 @@ investigator_vegetation_reference_audit:
   minimum_mean_loco_auc: 0.75
   minimum_mean_loco_balanced_accuracy: 0.70
   minimum_fraction_heldout_cubes_passing_balanced_accuracy: 0.70
-  chickpea_centres_must_be_polygon_core_nonsoil: true
-  weed_centres_must_be_outside_chickpea_core: true
+  chickpea_centres_must_be_polygon_core_nonsoil: false
+  weed_centres_must_be_outside_chickpea_core: false
+  polygon_and_centre_soil_checks_role: diagnostic_not_reference_veto
+  investigator_confirmed_class_is_reference_authority: true
   exclude_soil_and_nodata_pixels_before_aggregation: true
   historical_chickpea_and_weed_masks_are_not_reference_truth: true
   write_probability_geotiffs: false

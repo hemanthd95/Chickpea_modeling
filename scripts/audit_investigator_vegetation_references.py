@@ -114,6 +114,25 @@ def aggregate_reference_spectrum(
     return np.median(values[usable], axis=0).astype(np.float32), diagnostics
 
 
+def reference_is_usable(
+    spectrum: np.ndarray | None,
+    diagnostics: dict,
+    centre_observed: bool,
+    minimum_usable_pixels: int,
+) -> bool:
+    """Apply spectral QC without overriding investigator-confirmed truth.
+
+    Polygon support and exact-centre soil status remain registration diagnostics,
+    not label vetoes. A small reference circle can straddle a rasterized boundary
+    or one noisy soil-mask pixel while retaining a valid non-soil spectrum.
+    """
+    return bool(
+        spectrum is not None
+        and diagnostics["usable_nonsoil_pixels"] >= minimum_usable_pixels
+        and centre_observed
+    )
+
+
 def fit_separator(features, labels, regularization_c, iterations, seed):
     scaler = StandardScaler().fit(features)
     model = LogisticRegression(
@@ -278,10 +297,8 @@ def main() -> None:
                 centre_support == 2 if point.kind == "confirmed_chickpea"
                 else centre_support != 2
             )
-            usable = bool(
-                spectrum is not None
-                and diagnostic["usable_nonsoil_pixels"] >= minimum_usable
-                and centre_observed and not centre_soil and expected_position
+            usable = reference_is_usable(
+                spectrum, diagnostic, centre_observed, minimum_usable
             )
             row = {
                 "cube_id": cube_id,
@@ -297,6 +314,9 @@ def main() -> None:
                 "centre_is_soil": centre_soil,
                 "centre_is_observed": centre_observed,
                 "centre_position_matches_reference": expected_position,
+                "geometry_or_soil_qc_warning": bool(
+                    centre_soil or not expected_position
+                ),
                 **diagnostic,
                 "usable_reference": usable,
             }
@@ -321,12 +341,14 @@ def main() -> None:
         .reindex(index=primary, columns=list(LABELS), fill_value=0)
     )
     if (usable_counts < minimum_points).any().any():
+        deficient = usable_counts[usable_counts < minimum_points].stack()
         bad = point_qc.loc[
             ~point_qc["usable_reference"], "annotation_id"
         ].tolist()
         raise ValueError(
             "Too few usable references remain in at least one cube/class after "
-            f"geometry/soil/NoData QC; rejected IDs begin: {bad[:5]}"
+            "observed non-soil spectral QC; deficient counts="
+            f"{deficient.to_dict()}; rejected IDs begin: {bad[:5]}"
         )
     features = np.stack(spectra)
     target = np.asarray(labels, dtype=np.uint8)
@@ -515,6 +537,7 @@ def main() -> None:
         "sensitivity_cubes_reference_excluded": ordered_cube_ids(sensitivity),
         "expansion_cubes_projection_only": ordered_cube_ids(expansion),
         "historical_chickpea_and_weed_masks_used_as_truth": False,
+        "polygon_and_centre_soil_checks_used_as_label_vetoes": False,
         "probability_geotiffs_written": False,
         "categorical_masks_written": False,
         "authoritative_masks_modified": False,

@@ -1,5 +1,14 @@
 # Chickpea weak-mask refinement — 2026-08-07
 
+## 2026-08-11 investigator-reference QC correction
+
+- Investigator-confirmed point classes remain the reference authority.
+- Polygon support and exact-centre soil status are retained as registration/QC
+  warnings, not label vetoes. Soil and NoData pixels inside each sampling circle
+  are still excluded before its bandwise median spectrum is calculated.
+- This prevents a rasterized boundary or one noisy centre pixel from discarding
+  an otherwise usable 3 cm reference neighbourhood, as occurred in cube 20.
+
 The investigator documented the Field 1 mask provenance. Chickpea masks began as
 Spectronon Magic-feature selections and were subsequently filtered with OpenCV
 Hough geometry. Soil was defined using NDVI < 0.3; weed is the residual class
