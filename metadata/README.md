@@ -172,3 +172,11 @@ The investigator probability threshold audit is stored under
 `metadata/local/reports/mask_refinement/investigator_chickpea_probability_review/threshold_audit/`.
 It presents conservative chickpea/weed review thresholds and an unresolved
 middle class; these outputs are diagnostics and are not authoritative masks.
+
+`scripts/materialize_investigator_mask_review_candidates.py` converts the
+accepted threshold audit into explicitly review-only per-cube GeoTIFFs under
+`data/processed/investigator_mask_review_candidates/`. Soil and investigator
+alleys retain precedence, polygon edges remain unresolved, Cube 32 is forced
+unresolved because of its frozen transfer warning, and non-primary cubes are
+diagnostic-only. The layers cannot replace authoritative masks without a later
+visual-acceptance and freeze step.
