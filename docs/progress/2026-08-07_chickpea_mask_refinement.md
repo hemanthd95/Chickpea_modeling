@@ -400,3 +400,16 @@ chickpea/weed masks are not used as truth, and no categorical mask is written.
   balanced accuracy 0.5769) and is not removed from the evidence.
 - The next action is contract materialization. No categorical mask is accepted
   and no supervised model is retrained at this stage.
+## Investigator-guided probability review
+
+- The accepted 354-point investigator reference set (348 usable spectra) is
+  now the sole vegetation-class authority for the next review stage.
+- `scripts/build_investigator_chickpea_probability_maps.py` reconstructs the
+  frozen point-neighbourhood medians, fits one balanced logistic review
+  separator, and scores only polygon-guided non-soil candidate support.
+- Dense candidate features use a 3 cm map-space neighbourhood and the same
+  bandwise-median aggregation used by the reference audit.
+- Outputs are continuous probabilities, not categorical masks. Cube 32 is
+  explicitly marked with its frozen transfer warning; cubes 12/14/15 remain
+  projection-only and cubes 24/28 remain sensitivity-only.
+- No authoritative mask is replaced and no supervised benchmark is retrained.
