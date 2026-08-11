@@ -277,3 +277,23 @@ investigator_vegetation_probability_review:
   automatically_materialize_categorical_masks: false
   automatically_replace_authoritative_masks: false
   automatically_retrain_supervised_models: false
+
+# Continuous probabilities are audited as a three-way review triage, never as
+# a categorical mask. Threshold performance is estimated only from held-out
+# investigator points; dense-pixel precision is not assumed from point-level
+# precision. Cube 32 remains an explicit transfer warning.
+investigator_probability_threshold_audit:
+  status: enabled_after_probability_review_contract
+  probability_contract_filename: field1_investigator_chickpea_probability_review_contract.yaml
+  reference_contract_filename: field1_investigator_vegetation_reference_contract.yaml
+  chickpea_threshold_candidates: [0.70, 0.80, 0.85]
+  weed_threshold_candidates: [0.15, 0.20, 0.30]
+  display_chickpea_threshold: 0.80
+  display_weed_threshold: 0.15
+  minimum_point_precision_for_display_threshold: 0.95
+  minimum_point_precision_wilson_lower_95: 0.90
+  transfer_warning_cubes_remain_unresolved: true
+  write_categorical_geotiffs: false
+  automatically_materialize_masks: false
+  automatically_replace_authoritative_masks: false
+  automatically_retrain_models: false
