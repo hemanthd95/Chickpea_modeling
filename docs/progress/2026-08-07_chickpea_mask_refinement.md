@@ -430,3 +430,15 @@ chickpea/weed masks are not used as truth, and no categorical mask is written.
 - The audit writes CSV diagnostics and visual previews only. It cannot write a
   categorical GeoTIFF, modify an authoritative mask, retrain a model, or open
   Field 2.
+
+### Threshold gate result and review-candidate stage
+
+- At P(chickpea) >= 0.80, held-out investigator points yielded 97.48% precision
+  (92.85% Wilson lower 95% bound) and 66.29% recall.
+- At P(chickpea) <= 0.15, the weed decision yielded 95.61% precision (90.14%
+  Wilson lower bound) and 63.01% recall. The predeclared gate passed.
+- A separate materialization stage now creates review-only candidates while
+  keeping the middle interval unresolved. Soil and alleys retain precedence;
+  the 5 cm polygon edge stays unresolved; Cube 32 is forced unresolved; cubes
+  12/14/15 and 24/28 remain diagnostic-only. No authoritative mask or model
+  input changes until the resulting maps receive explicit visual acceptance.
