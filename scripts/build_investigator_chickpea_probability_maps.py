@@ -198,11 +198,26 @@ def role_note(role: str, transfer_warning: bool) -> str:
     return "PRIMARY REVIEW"
 
 
+def yaml_native(value):
+    """Recursively convert NumPy scalar values before safe YAML serialization."""
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, dict):
+        return {str(key): yaml_native(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set, np.ndarray)):
+        return [yaml_native(item) for item in value]
+    return value
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--paths", required=True, type=Path)
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--bands", required=True, type=Path)
+    parser.add_argument(
+        "--finalize-only", action="store_true",
+        help="Write the provenance contract from already completed probability outputs.",
+    )
     args = parser.parse_args()
 
     paths = yaml.safe_load(args.paths.read_text())
@@ -310,6 +325,95 @@ def main() -> None:
     overview_tiles = []
 
     cube_ids = ordered_cube_ids(roles.index)
+
+    def finalize_contract(paths_to_hash: list[Path]) -> Path:
+        contract = {
+            "status": "field1_investigator_chickpea_probability_review_materialized",
+            "field": "Field 1",
+            "output_semantics": "continuous_chickpea_probability_for_review_only",
+            "reference_authority": "frozen_investigator_confirmed_points",
+            "usable_reference_points": int(len(features)),
+            "reference_cubes": ordered_cube_ids(np.unique(reference_cubes)),
+            "separator": {
+                "type": "standardized_balanced_logistic_regression",
+                "spectral_band_section": band_section,
+                "neighbourhood_aggregation": (
+                    "bandwise_median_after_soil_and_nodata_exclusion"
+                ),
+                "dense_neighbourhood_radius_m": radius_m,
+                "minimum_usable_pixels": minimum_pixels,
+                "intercept": float(model.intercept_[0]),
+            },
+            "transfer_warning_cubes": ordered_cube_ids(warning_cubes),
+            "candidate_support_codes_scored": [
+                int(value) for value in support_codes
+            ],
+            "probability_threshold_is_a_class_label": False,
+            "categorical_masks_written": False,
+            "authoritative_masks_modified": False,
+            "supervised_models_retrained": False,
+            "review_separator_fitted": True,
+            "field2_accessed": False,
+            "source_hashes": {
+                "frozen_reference_contract": sha256(reference_contract_path),
+                "candidate_materialization_contract": sha256(candidate_contract_path),
+                "configuration": sha256(args.config),
+                "spectral_band_config": sha256(args.bands),
+                "authoritative_manifest": sha256(manifest_path),
+                "annotation_layer_manifest": sha256(layer_manifest_path),
+                **{
+                    f"candidate_support:{cube_id}": sha256(
+                        candidate_root / cube_id
+                        / "polygon_guided_candidate_support.tif"
+                    )
+                    for cube_id in cube_ids
+                },
+            },
+            "output_hashes": {
+                str(path.relative_to(project)): sha256(path)
+                for path in paths_to_hash
+            },
+        }
+        contract_path = (
+            contracts
+            / "field1_investigator_chickpea_probability_review_contract.yaml"
+        )
+        contract_path.write_text(
+            yaml.safe_dump(yaml_native(contract), sort_keys=False)
+        )
+        return contract_path
+
+    if args.finalize_only:
+        summary_path = reports / "investigator_chickpea_probability_summary.csv"
+        coefficient_path = reports / "investigator_review_separator_coefficients.csv"
+        overview_path = reports / "investigator_chickpea_probability_review_overview.png"
+        output_paths = [summary_path, coefficient_path, overview_path]
+        for cube_id in cube_ids:
+            output_paths.extend([
+                output_root / cube_id / "chickpea_review_probability.tif",
+                individual / f"{cube_id}_chickpea_probability_review.png",
+            ])
+        missing = [path for path in output_paths if not path.is_file()]
+        if missing:
+            raise FileNotFoundError(
+                "Finalize-only requested, but completed outputs are missing: "
+                + ", ".join(str(path) for path in missing[:5])
+            )
+        completed = pd.read_csv(summary_path)
+        if set(completed["cube_id"].astype(str)) != set(map(str, cube_ids)):
+            raise ValueError("Existing summary does not contain the expected 19 cubes")
+        contract_path = finalize_contract(output_paths)
+        print("Existing probability outputs verified; scoring was not repeated.")
+        print(f"Summary: {summary_path}")
+        print(f"Visual QC: {overview_path}")
+        print(f"Contract: {contract_path}")
+        print(
+            "Continuous probability review finalized; no categorical or "
+            "authoritative mask changed, no supervised model was retrained, "
+            "and Field 2 remained locked."
+        )
+        return
+
     for cube_number, cube_id in enumerate(cube_ids, 1):
         record = records[cube_id]
         role = str(roles.loc[cube_id])
@@ -490,49 +594,7 @@ def main() -> None:
     plt.close(figure)
     output_paths.append(overview_path)
 
-    contract = {
-        "status": "field1_investigator_chickpea_probability_review_materialized",
-        "field": "Field 1",
-        "output_semantics": "continuous_chickpea_probability_for_review_only",
-        "reference_authority": "frozen_investigator_confirmed_points",
-        "usable_reference_points": int(len(features)),
-        "reference_cubes": ordered_cube_ids(np.unique(reference_cubes)),
-        "separator": {
-            "type": "standardized_balanced_logistic_regression",
-            "spectral_band_section": band_section,
-            "neighbourhood_aggregation": "bandwise_median_after_soil_and_nodata_exclusion",
-            "dense_neighbourhood_radius_m": radius_m,
-            "minimum_usable_pixels": minimum_pixels,
-            "intercept": float(model.intercept_[0]),
-        },
-        "transfer_warning_cubes": ordered_cube_ids(warning_cubes),
-        "candidate_support_codes_scored": [int(value) for value in support_codes],
-        "probability_threshold_is_a_class_label": False,
-        "categorical_masks_written": False,
-        "authoritative_masks_modified": False,
-        "supervised_models_retrained": False,
-        "review_separator_fitted": True,
-        "field2_accessed": False,
-        "source_hashes": {
-            "frozen_reference_contract": sha256(reference_contract_path),
-            "candidate_materialization_contract": sha256(candidate_contract_path),
-            "configuration": sha256(args.config),
-            "spectral_band_config": sha256(args.bands),
-            "authoritative_manifest": sha256(manifest_path),
-            "annotation_layer_manifest": sha256(layer_manifest_path),
-            **{
-                f"candidate_support:{cube_id}": sha256(
-                    candidate_root / cube_id / "polygon_guided_candidate_support.tif"
-                )
-                for cube_id in cube_ids
-            },
-        },
-        "output_hashes": {
-            str(path.relative_to(project)): sha256(path) for path in output_paths
-        },
-    }
-    contract_path = contracts / "field1_investigator_chickpea_probability_review_contract.yaml"
-    contract_path.write_text(yaml.safe_dump(contract, sort_keys=False))
+    contract_path = finalize_contract(output_paths)
 
     print(f"Review probability GeoTIFF root: {output_root}")
     print(f"Summary: {summary_path}")
