@@ -4,6 +4,7 @@ from affine import Affine
 from scripts.build_investigator_chickpea_probability_maps import (
     dense_neighbourhood_features,
     map_disk_offsets,
+    yaml_native,
 )
 
 
@@ -44,3 +45,10 @@ def test_dense_features_marks_insufficient_neighbourhood_invalid():
     )
     assert counts.tolist() == [1]
     assert np.isnan(features[0, 0])
+
+
+def test_yaml_native_converts_numpy_strings_and_scalars():
+    converted = yaml_native({"cubes": [np.str_("field1_cube20")], "count": np.int64(1)})
+    assert converted == {"cubes": ["field1_cube20"], "count": 1}
+    assert type(converted["cubes"][0]) is str
+    assert type(converted["count"]) is int
