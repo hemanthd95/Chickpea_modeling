@@ -413,3 +413,9 @@ chickpea/weed masks are not used as truth, and no categorical mask is written.
   explicitly marked with its frozen transfer warning; cubes 12/14/15 remain
   projection-only and cubes 24/28 remain sensitivity-only.
 - No authoritative mask is replaced and no supervised benchmark is retrained.
+- The first complete 19-cube run exposed a provenance-only YAML serialization
+  error after all rasters, summaries, and figures had already been written:
+  `numpy.str_` cube identifiers were not accepted by `yaml.safe_dump`. The
+  writer now converts NumPy scalar values to native Python types and provides
+  `--finalize-only` to verify completed outputs and write the contract without
+  repeating dense spectral scoring.
