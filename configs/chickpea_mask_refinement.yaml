@@ -254,3 +254,26 @@ investigator_vegetation_reference_freeze:
   automatically_materialize_categorical_masks: false
   automatically_replace_authoritative_masks: false
   automatically_retrain_models: false
+
+# Continuous review rasters are permitted only after the investigator point
+# contract is frozen. The same bandwise-median neighbourhood representation is
+# used for both the frozen references and every scored candidate centre.
+investigator_vegetation_probability_review:
+  status: enabled_after_reference_contract_freeze
+  reference_contract_filename: field1_investigator_vegetation_reference_contract.yaml
+  candidate_contract_filename: field1_polygon_guided_candidate_materialization_contract.yaml
+  spectral_band_section: primary
+  dense_neighbourhood_radius_m: 0.03
+  minimum_usable_pixels_per_neighbourhood: 3
+  prediction_chunk_size: 2500
+  score_candidate_support_codes: [2, 4]
+  probability_nodata_value: -9999.0
+  logistic_regularization_c: 1.0
+  maximum_iterations: 1000
+  seed: 42
+  output_root_relative: data/processed/investigator_chickpea_probability_review
+  write_continuous_probability_geotiffs: true
+  probability_threshold_is_a_class_label: false
+  automatically_materialize_categorical_masks: false
+  automatically_replace_authoritative_masks: false
+  automatically_retrain_supervised_models: false
