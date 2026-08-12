@@ -6,6 +6,31 @@ corrections.
 
 ## 2026-08-12
 
+### Supervised benchmark finalized; Field 2 compatibility stop frozen
+
+- Tagged immutable benchmark commit
+  `da95fd59b7dc5d8ba4add96ed43b398bb7c93749` as
+  `supervised-confident-v1-da95fd5` and verified all 15 primary nested checkpoint
+  hashes, contracts, wavelengths, and reported metrics.
+- Completed a Field 1-only grouped reliance audit over 38 physical wavelength
+  groups, two occlusion methods, three branch routes, five folds, and three seeds.
+  Adjacent-band interpolation left 401.84–414.07 nm as the only corrected stable
+  macro-F1 region, emphasizing correlated-band redundancy.
+- Frozen-model ablations established reliance on both branches: center and
+  context neutralization reduced macro-F1 by 0.670249 and 0.294874 respectively.
+  These are destructive reliance diagnostics, not retrained model comparisons.
+- Fixed-index audit used exact 550.54/669.09/720.67/798.91 nm bands. SAVI L=0.5
+  was not computed because unit-reflectance scale provenance is absent.
+- Frozen three-seed with- and without-alley deployment ensembles using only 13
+  eligible primary Field 1 cubes. Two-GPU real-patch checks and all six checkpoint
+  reloads passed; no legacy deployment model was fabricated.
+- Stopped at Field 2 status `blocked_not_georectified_or_authorized`: authorized
+  paths are blank, the manifest has zero Field 2 rows, and no Field 2 header,
+  scientific array, coordinate, label, or prediction was opened. Cubes 24/28
+  remain previously inspected sensitivity data, never blind substitutes.
+- Wrote the interim report and exact georectified-product checklist in
+  `docs/progress/2026-08-12_final_supervised_model_report.md`.
+
 ### Confident-label nested supervised benchmark passed
 
 - Confirmed PyTorch 2.10.0+cu130 sees exactly two NVIDIA RTX 5000 Ada Generation

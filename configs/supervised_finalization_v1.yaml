@@ -1,0 +1,84 @@
+version: supervised_finalization_v1
+benchmark_commit: da95fd59b7dc5d8ba4add96ed43b398bb7c93749
+benchmark_tag: supervised-confident-v1-da95fd5
+field: Field 1
+field2_locked: true
+
+interpretability:
+  architecture: center_context_fusion
+  variant: with_alley
+  wavelength_group_target_width_nm: 12.5
+  occlusion_methods: [fold_training_mean, adjacent_wavelength_interpolation]
+  routes: [both_branches, center_branch_only, context_branch_only]
+  maximum_samples_per_class_spatial_group: 8
+  maximum_samples_per_outer_fold: 12000
+  sample_seed: 42012
+  bootstrap_replicates: 1000
+  bootstrap_seed: 42013
+  confidence_level: 0.95
+  multiple_comparison: benjamini_hochberg
+  false_discovery_rate: 0.05
+  stable_minimum_positive_folds: 4
+  calibration_bins: 15
+  batch_size: 512
+  branch_ablations:
+    - center_neutralized
+    - context_neutralized
+    - both_neutralized
+    - context_spatial_shuffle
+    - context_spatial_mean
+  integrated_gradients: omitted_computationally_optional
+
+spectral_indices:
+  definitions:
+    NDVI: "(R_near_800 - R_near_670) / (R_near_800 + R_near_670)"
+    GNDVI: "(R_near_800 - R_near_550) / (R_near_800 + R_near_550)"
+    NDRE: "(R_near_800 - R_near_720) / (R_near_800 + R_near_720)"
+    SAVI_L0_5: "1.5 * (R_near_800 - R_near_670) / (R_near_800 + R_near_670 + 0.5)"
+    NIR_RED_RATIO: "R_near_800 / R_near_670"
+  nearest_wavelength_targets_nm: [550.0, 670.0, 720.0, 800.0]
+  savi_status: not_computed_missing_unit_reflectance_scale_provenance
+  threshold_optimization: prohibited
+
+deployment:
+  architecture: center_context_fusion
+  variants: [with_alley, without_alley]
+  seeds: [42, 43, 44]
+  epoch_rule: median_field1_inner_validation_selected_epoch_by_variant
+  fixed_epochs:
+    with_alley: 10
+    without_alley: 11
+  primary_field1_cubes:
+    - field1_cube20
+    - field1_cube22
+    - field1_cube30
+    - field1_cube31
+    - field1_cube35
+    - field1_cube40
+    - field1_cube45
+    - field1_cube47
+    - field1_cube49
+    - field1_cube50
+    - field1_cube54
+    - field1_cube55
+    - field1_cube56
+  prohibited_primary_fit_cubes:
+    - field1_cube12
+    - field1_cube14
+    - field1_cube15
+    - field1_cube24
+    - field1_cube28
+    - field1_cube32
+  minimum_separation_m: 0.15
+  ground_cell_resolution_m: 0.015
+  normalization_scope: eligible_field1_deployment_fitting_centers_only
+  calibration: none_frozen_before_external_validation
+  ensemble: arithmetic_mean_of_three_seed_softmax_probabilities
+  batch_size_candidates: [256, 512, 1024]
+  vram_safety_fraction: 0.20
+  gpu_indices: [0, 1]
+
+field2_compatibility:
+  authorized_data_status: absent_not_georectified
+  action: stop_without_opening_field2
+  cubes24_28_substitution: prohibited
