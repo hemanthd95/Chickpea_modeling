@@ -4,6 +4,35 @@ Append a dated entry for every work session that changes data interpretation,
 code, experimental design, or results. Do not rewrite prior entries; append
 corrections.
 
+## 2026-08-12
+
+### Confident-label nested supervised benchmark passed
+
+- Confirmed PyTorch 2.10.0+cu130 sees exactly two NVIDIA RTX 5000 Ada Generation
+  GPUs, then ran every repository Python command with the explicit project Conda
+  interpreter. No DataParallel or CPU fallback was used.
+- Materialized provenance-preserving Field 1 confident labels with soil,
+  chickpea, weed, and unresolved states. Fold-specific vegetation separators
+  exclude both Test and Stop folds. Cubes 24/28 remain phenology sensitivity,
+  Cubes 12/14/15 remain positive-support expansion, and Cube 32 remains sparse
+  transfer-warning evidence only.
+- Froze patch-safe, 0.15 m thinned, ground-deduplicated nested samples and an
+  exhaustive 5,924,107-observation primary evaluation population. Deterministic
+  rerun, role separation, boundary safety, NoData, and Field 2 lock gates passed.
+- Passed a real-data CUDA smoke test before full fitting. Independent workers on
+  both GPUs completed 30 center-context checkpoints: five outer folds, three
+  seeds, and with-/without-alley variants.
+- On equal-weight held-out spatial groups, the with-alley ensemble achieved
+  balanced accuracy 0.932545 and macro-F1 0.876089 versus 0.785344 and 0.648250
+  for the frozen legacy model. Paired bootstrap improvements were +0.148134
+  balanced accuracy and +0.228297 macro-F1, with both 95% intervals above zero.
+- Alley enrichment materially improved recall and macro performance, but its
+  weed-precision interval crossed zero. Worst-cube macro-F1 remains 0.431107 and
+  Cube 32 remains an explicit failure/transfer warning. No Field 2 claim is made.
+- Added task-specific configuration, label composition, data preparation,
+  validation, dual-GPU training, paired evaluation, tests, and the full report in
+  `docs/progress/2026-08-12_confident_label_supervised.md`. All 41 tests pass.
+
 ## 2026-08-04
 
 ### Multi-GPU stall isolated for hardware benchmarking
