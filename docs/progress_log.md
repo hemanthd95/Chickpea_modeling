@@ -4,6 +4,29 @@ Append a dated entry for every work session that changes data interpretation,
 code, experimental design, or results. Do not rewrite prior entries; append
 corrections.
 
+## 2026-08-14
+
+### Field 2 georectified readiness inventory completed; annotation remains blocked
+
+- Audited 40 authorized Field 2 cube identifiers across 120 ENVI headers and
+  120 payloads using read-only memory maps and `GDAL_PAM_ENABLED=NO`.
+- All 120 header/payload pairs passed one-to-one resolution and byte-size gates;
+  independent before/after SHA-256 snapshots of all 240 source files were
+  identical.
+- All 111 frozen Field 1 model wavelengths matched every Field 2 reflectance
+  cube within 0.00003 nm, with strictly increasing order and no duplicates.
+- All 80 reflectance-to-PCA/index grid comparisons had identical CRS, affine
+  transform, dimensions, GSD, bounds, and pixel centers. No resampling occurred.
+- Generated deterministic sampled QC, 40 prediction-free review previews, four
+  overview figures, footprint/overlap tables, and a detailed readiness report.
+- PCA and stored-index products contain transformed nonzero values outside the
+  reflectance zero-filled footprint. Because no explicit NoData value or aligned
+  valid-data mask was supplied, all cubes remain blocked for actual annotation
+  pending a frozen authoritative valid-support rule; biological roles remain
+  `unreviewed`.
+- No label, prediction, probability, model training, or SSL experiment was
+  produced. The frozen Field 1 benchmark and checkpoints were unchanged.
+
 ## 2026-08-12
 
 ### Supervised benchmark finalized; Field 2 compatibility stop frozen

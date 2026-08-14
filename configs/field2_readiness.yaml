@@ -1,0 +1,38 @@
+version: field2_georectified_readiness_v1
+field_identifier: Field 2
+source_path_key: field2.readiness_roots
+authorized_root_names:
+  reflectance: Field_2_Georectified
+  pca: Field_2_Geo_PCA
+  stored_index: Field_2_Geo_NDVI
+source_name_prefix: Field_2
+output_root: metadata/local/reports/field2_readiness
+contract_path: metadata/local/contracts/field2_georectified_inventory_contract.yaml
+temporary_root: metadata/local/tmp/field2_readiness
+checksum_algorithm: sha256
+sampling:
+  seed: 20260814
+  pixels_per_cube: 4096
+  preview_percentiles: [2.0, 98.0]
+false_colour_wavelengths_nm: [800.0, 670.0, 550.0]
+field1_model_bands:
+  first_band_index: 3
+  last_band_index_inclusive: 113
+  wavelength_tolerance_nm: 0.05
+alignment:
+  affine_absolute_tolerance: 1.0e-9
+  numerical_equivalence_tolerance: 1.0e-7
+  expected_pca_bands: 5
+  expected_stored_index_bands: 1
+validity:
+  reflectance_zero_is_nodata: true
+  index_nonfinite_is_invalid: true
+safety:
+  source_open_mode: read_only
+  numpy_memmap_mode: r
+  gdal_pam_enabled: "NO"
+  allow_writable_source_permissions: true
+  reject_outputs_inside_source_roots: true
+  predictions_prohibited: true
+  labels_prohibited: true
+  training_prohibited: true
