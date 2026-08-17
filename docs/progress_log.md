@@ -916,3 +916,24 @@ corrections.
   explicit role-contradiction handling.
 - No checkpoint, model output, prediction, probability, pseudo-label, training,
   model selection, or automatic biological inference entered the workflow.
+
+
+### Full-resolution natural-RGB point-annotation display frozen
+
+- Added a write-once display addendum and 40 ignored full-resolution RGB PNGs
+  derived only from Field 2 reflectance and frozen valid-support masks. Every
+  cube uses 669.09/550.54/479.80 nm for red/green/blue, a cube-level 2nd–98th
+  percentile stretch, uint8 output, and black outside support.
+- Made natural RGB the default while retaining false colour, PCA, stored index,
+  and support context as selectable views. The interface now provides complete
+  cube and centered magnified views, 2×/4×/8×/16× nearest-neighbor zoom, an
+  unfilled sampled-pixel outline, optional high-zoom grid, and shortcuts.
+- Versioned every point record against the display contract. Older reviewed
+  labels would be preserved and flagged for visual re-review; because no point
+  annotation file existed, the initialized revision has 800 main records, zero
+  reviewed, zero labeled, and zero requiring re-review.
+- The live API exposes exactly 800 main samples and no reserve samples. All 94
+  tests and the frozen Field 1, Field 2 role, Field 2 sampling, and RGB-display
+  validators passed; frozen main/reserve/combined hashes remained unchanged.
+- No checkpoint, prediction, probability, pseudo-label, suggested class,
+  training, Field 1 label, PCA value, or stored-index value entered RGB.
