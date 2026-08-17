@@ -837,3 +837,28 @@ corrections.
 - The overview contains only model-ready chickpea pixels on black; no soil, weed,
   false-colour imagery, or synthetic data are displayed. Raw masks are never
   modified, and Field 2 remains locked.
+
+## 2026-08-17
+
+### Field 2 reflectance valid-support masks frozen
+
+- Derived read-only Field 2 support solely from finite, nonzero reflectance in
+  frozen model-input Python bands 3–113 (ENVI bands 4–114); no PCA, stored
+  index, prediction, probability, label, or biological assumption entered the
+  rule.
+- Audited finite-any-nonzero, finite-all-nonzero, full-spectrum-any-nonzero,
+  and positive-norm thresholds above 0, 1, 5, and 10 stored units. All seven
+  candidates agreed pixel-for-pixel across all 40 cubes.
+- Retained every observed component without morphology. Cube 02's coherent
+  upper scan strips were explicitly reviewed and retained; its two remaining
+  fragments total 29 pixels. No other cube has an unexplained non-small
+  interior component.
+- Materialized 40 ignored uint8 GeoTIFF masks with exact source grids and
+  hashes. All 40 cubes now have status `annotation_ready_prediction_free`,
+  while every investigator role remains `unreviewed`.
+- Confirmed that PCA and stored-index rasters each contain 18,349,592 nonzero
+  pixels outside authoritative reflectance support. The source rasters were
+  not altered or resampled.
+- Before/after path, size, `mtime_ns`, and SHA-256 snapshots of all 240 source
+  files are identical. No supervised or SSL training occurred, and the frozen
+  Field 1 benchmark remained unchanged.
