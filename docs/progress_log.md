@@ -896,3 +896,23 @@ corrections.
   and SHA-256 `a76425dd259f4fb245db6d51824a99d4f960e044ca5aab2cfc114578bcf06c96`.
 - The blind point-sampling frame and sampling contract remain absent. No point
   annotator, inference, pseudo-labeling, training, or model selection ran.
+
+
+### Prediction-free Field 2 blind sampling frozen
+
+- Materialized the predeclared 800-point main frame and a disjoint 396-point
+  reserve from frozen valid support, frozen cube roles, ground coordinates,
+  deterministic 5 m blocks, and within-cube stored-scalar rank strata only.
+- Achieved exact per-cube allocations for all 40 cubes. The 1,196 combined
+  points have unique IDs and ground cells, zero support/context violations,
+  and minimum separation 0.250599 m across 216 spatial blocks.
+- Froze first-stage/final inclusion probabilities and design weights, immutable
+  input/output hashes, allocation and stratum/block audits, and a prediction-free
+  map. Same-seed selection reproduced byte-identical main and reserve frames.
+- Locked the reserve from annotation behind a separate immutable authorization
+  and prespecified support gates unrelated to predictions or model performance.
+- Completed and launched the main-only point annotator with 800 neutral records,
+  no default label, no reserve endpoint, atomic save/resume, audit exports, and
+  explicit role-contradiction handling.
+- No checkpoint, model output, prediction, probability, pseudo-label, training,
+  model selection, or automatic biological inference entered the workflow.
