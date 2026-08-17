@@ -862,3 +862,20 @@ corrections.
 - Before/after path, size, `mtime_ns`, and SHA-256 snapshots of all 240 source
   files are identical. No supervised or SSL training occurred, and the frozen
   Field 1 benchmark remained unchanged.
+
+
+### Prediction-free Field 2 cube-role review prepared
+
+- Validated the frozen Field 1 finalization and the exact 40-cube Field 2
+  readiness, source, and valid-support contracts before preparing review data.
+- Built checksum-tracked false-colour, supplied-PCA, stored-index, valid-support,
+  and support-outline views for all 40 cubes. All biological roles remain
+  `unreviewed`; generated PNGs and local manifests remain ignored.
+- Added a localhost browser reviewer with zoom/pan/reset, navigation, independent
+  role flags, logical validation, atomic save/resume, explicit clear-current, an
+  audit table, and a reviewed/unreviewed overview.
+- Implemented a separate all-40-reviewed role-freeze gate, the later deterministic
+  blind sampling generator, and a future point-annotation interface skeleton.
+  Freeze and sampling were not run, and the point annotator was not launched.
+- No checkpoint, prediction, probability, Field 1 label, automatic biological
+  role, Field 2 categorical label, or training operation entered this work.

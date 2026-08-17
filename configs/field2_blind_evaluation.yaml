@@ -1,0 +1,138 @@
+version: field2_blind_evaluation_v1
+field_identifier: Field 2
+benchmark_commit: da95fd59b7dc5d8ba4add96ed43b398bb7c93749
+readiness_commit: 1f52c744a2b4d0a7065302e4f4f2377a3d17603f
+valid_support_commit: e2376b8824bac440dbde8c036a643de29bdac9c5
+valid_support_manifest_sha256: 1f48ffe67d7ad2cbf95cca5c2e6e98d15245843435c519bbb8a67841c2bbf3e3
+source_manifest_sha256: 0dbe286a152748f0ab8d338b095b308d977cfcc3568999b86e7f9f4e306ee44e
+
+expected_cube_ids:
+  - field2_cube02
+  - field2_cube03
+  - field2_cube04
+  - field2_cube05
+  - field2_cube06
+  - field2_cube07
+  - field2_cube08
+  - field2_cube09
+  - field2_cube11
+  - field2_cube12
+  - field2_cube13
+  - field2_cube14
+  - field2_cube16
+  - field2_cube17
+  - field2_cube18
+  - field2_cube19
+  - field2_cube20
+  - field2_cube21
+  - field2_cube22
+  - field2_cube23
+  - field2_cube24
+  - field2_cube25
+  - field2_cube26
+  - field2_cube27
+  - field2_cube28
+  - field2_cube29
+  - field2_cube30
+  - field2_cube31
+  - field2_cube32
+  - field2_cube33
+  - field2_cube34
+  - field2_cube35
+  - field2_cube36
+  - field2_cube37
+  - field2_cube38
+  - field2_cube39
+  - field2_cube40
+  - field2_cube41
+  - field2_cube42
+  - field2_cube43
+
+inputs:
+  readiness_inventory: metadata/local/reports/field2_readiness/field2_georectified_inventory.csv
+  readiness_annotation: metadata/local/reports/field2_readiness/field2_annotation_readiness.csv
+  valid_support_readiness: metadata/local/reports/field2_valid_support/field2_annotation_readiness.csv
+  valid_support_manifest: metadata/local/reports/field2_valid_support/field2_valid_support_mask_manifest.csv
+  valid_support_contract: metadata/local/contracts/field2_valid_support_contract.yaml
+  cube_footprints: metadata/local/reports/field2_readiness/field2_cube_footprints.csv
+
+review:
+  package_root: metadata/local/reports/field2_cube_role_review
+  package_manifest: metadata/local/reports/field2_cube_role_review/field2_cube_role_review_manifest.csv
+  package_contract: metadata/local/reports/field2_cube_role_review/field2_cube_role_review_package.yaml
+  annotations_root: metadata/local/annotations/field2_cube_roles
+  role_contract: metadata/local/contracts/field2_cube_role_contract.yaml
+  port: 8772
+  preview_max_dimension: 900
+  preview_percentiles: [2.0, 98.0]
+  false_colour_wavelengths_nm: [800.0, 670.0, 550.0]
+
+role_schema:
+  primary_roles:
+    - primary_three_class
+    - chickpea_absent_negative_control
+    - challenge_only
+    - sensitivity_only
+    - exclude_with_reason
+    - unreviewed
+  flags:
+    - chickpea_visible
+    - chickpea_very_small_or_immature
+    - chickpea_absent_confirmed
+    - ordinary_weed_visible
+    - tall_grass_weed_visible
+    - soil_visible
+    - mixed_pixels_common
+    - annotation_difficult
+    - georectification_concern
+    - other_visual_concern
+  confidence: [high, medium, low]
+
+sampling:
+  seed: 20260817
+  spatial_group_size_m: 5.0
+  minimum_separation_m: 0.25
+  geographic_ground_cell_size_m: 0.10
+  scalar_index_rank_strata:
+    - rank_00_20
+    - rank_20_40
+    - rank_40_60
+    - rank_60_80
+    - rank_80_100
+  proposed_points_per_cube_by_role:
+    primary_three_class: 80
+    chickpea_absent_negative_control: 60
+    challenge_only: 100
+    sensitivity_only: 40
+    exclude_with_reason: 0
+  proposed_counts_status: proposed_pending_investigator_role_freeze
+  repeated_view_reliability:
+    enabled: false
+    proposed_count: 0
+  output_root: metadata/local/annotations/field2_blind_sampling
+  sampling_frame: metadata/local/annotations/field2_blind_sampling/field2_blind_annotation_sampling_frame.csv
+  sampling_contract: metadata/local/contracts/field2_blind_sampling_frame_contract.yaml
+
+point_annotation:
+  labels:
+    - soil
+    - weed
+    - tall_grass_weed
+    - chickpea
+    - chickpea_soil_mixed
+    - chickpea_weed_mixed
+    - uncertain
+    - nodata_invalid
+  output_root: metadata/local/annotations/field2_blind_points
+  port: 8773
+
+safety:
+  gdal_pam_enabled: "NO"
+  localhost_only: true
+  source_open_mode: read_only
+  no_automatic_biological_roles: true
+  prediction_sources_prohibited: true
+  probability_sources_prohibited: true
+  embeddings_prohibited: true
+  field1_labels_prohibited: true
+  training_prohibited: true
