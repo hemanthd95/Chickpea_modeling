@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.stats import rankdata
+from scipy.spatial import cKDTree
 import yaml
 
 from chickpea_ssl.field2_readiness import sha256, yaml_safe
@@ -47,10 +48,10 @@ REVIEW_FLAGS = (
 CONFIDENCE_VALUES = ("high", "medium", "low")
 
 POINT_LABELS = (
-    "soil",
-    "weed",
-    "tall_grass_weed",
     "chickpea",
+    "ordinary_weed",
+    "tall_grass_weed",
+    "soil",
     "chickpea_soil_mixed",
     "chickpea_weed_mixed",
     "uncertain",
@@ -537,16 +538,136 @@ def minimum_separation_thin(frame: pd.DataFrame, distance_m: float) -> pd.DataFr
     if distance_m <= 0:
         raise ValueError("Minimum separation must be positive")
     accepted: list[int] = []
-    buckets: dict[tuple[int, int], list[tuple[float, float]]] = {}
-    ordered = frame.sort_values(["deterministic_selection_rank", "row", "column"])
+    buckets: dict[tuple[str, int, int], list[tuple[float, float]]] = {}
+    ordered = frame.sort_values(["deterministic_selection_rank", "cube_id", "row", "column"])
     for index, row in ordered.iterrows():
+        crs = str(row.crs) if "crs" in frame.columns else ""
         bx, by = int(np.floor(float(row.x) / distance_m)), int(np.floor(float(row.y) / distance_m))
-        neighbors = [point for dx in (-1, 0, 1) for dy in (-1, 0, 1) for point in buckets.get((bx + dx, by + dy), [])]
+        neighbors = [
+            point
+            for dx in (-1, 0, 1)
+            for dy in (-1, 0, 1)
+            for point in buckets.get((crs, bx + dx, by + dy), [])
+        ]
         if any((float(row.x) - x) ** 2 + (float(row.y) - y) ** 2 < distance_m ** 2 for x, y in neighbors):
             continue
         accepted.append(index)
-        buckets.setdefault((bx, by), []).append((float(row.x), float(row.y)))
+        buckets.setdefault((crs, bx, by), []).append((float(row.x), float(row.y)))
     return frame.loc[accepted].copy()
+
+
+def balanced_stratum_quotas(total: int, strata: Iterable[str]) -> dict[str, int]:
+    names = list(strata)
+    if total < 0 or not names:
+        raise ValueError("A nonnegative total and at least one rank stratum are required")
+    base, remainder = divmod(int(total), len(names))
+    return {name: base + int(position < remainder) for position, name in enumerate(names)}
+
+
+def _block_balanced_selection(
+    population: pd.DataFrame,
+    quota: int,
+    seed: int,
+    frame_name: str,
+    cube_id: str,
+    stratum: str,
+) -> pd.DataFrame:
+    if len(population) < quota:
+        raise ValueError(
+            f"{cube_id}:{stratum}:{frame_name}: requested={quota}, available={len(population)}, "
+            "limiting_rule=valid_context_unique_ground_cell_minimum_separation"
+        )
+    if quota == 0:
+        return population.head(0).copy()
+    queues = {}
+    for block, values in population.groupby("spatial_group_id", sort=False):
+        queues[str(block)] = list(
+            values.sort_values(["deterministic_selection_rank", "row", "column"]).index
+        )
+    block_order = sorted(
+        queues,
+        key=lambda block: (stable_selection_rank(seed, frame_name, cube_id, stratum, block), block),
+    )
+    selected: list[int] = []
+    position = 0
+    while len(selected) < quota:
+        progressed = False
+        for block in block_order:
+            queue = queues[block]
+            if position < len(queue):
+                selected.append(queue[position])
+                progressed = True
+                if len(selected) == quota:
+                    break
+        if not progressed:
+            raise ValueError(
+                f"{cube_id}:{stratum}:{frame_name}: requested={quota}, achieved={len(selected)}, "
+                "limiting_rule=spatial_block_capacity"
+            )
+        position += 1
+    result = population.loc[selected].copy()
+    block_population = population.groupby("spatial_group_id").size().to_dict()
+    block_quota = result.groupby("spatial_group_id").size().to_dict()
+    result["sampling_stratum_block_population"] = [block_population[value] for value in result.spatial_group_id]
+    result["sampling_stratum_block_quota"] = [block_quota[value] for value in result.spatial_group_id]
+    result["final_inclusion_probability"] = (
+        result["sampling_stratum_block_quota"] / result["sampling_stratum_block_population"]
+    )
+    result["sampling_frame"] = frame_name
+    return result
+
+
+def select_main_reserve_frames(
+    eligible: pd.DataFrame,
+    role_by_cube: dict[str, str],
+    main_counts: dict[str, int],
+    reserve_counts: dict[str, int],
+    strata: Iterable[str],
+    seed: int,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Select exact, disjoint, block-balanced frames from a frozen eligible frame."""
+    strata_names = list(strata)
+    main_parts: list[pd.DataFrame] = []
+    reserve_parts: list[pd.DataFrame] = []
+    for cube_id in role_by_cube:
+        role = role_by_cube[cube_id]
+        cube = eligible[eligible.cube_id == cube_id]
+        main_quotas = balanced_stratum_quotas(int(main_counts[role]), strata_names)
+        reserve_quotas = balanced_stratum_quotas(int(reserve_counts[role]), strata_names)
+        cube_main: list[pd.DataFrame] = []
+        for stratum in strata_names:
+            population = cube[cube.scalar_index_rank_stratum == stratum]
+            selected = _block_balanced_selection(
+                population, main_quotas[stratum], seed, "main", cube_id, stratum,
+            )
+            selected["cube_rank_stratum_requested"] = main_quotas[stratum]
+            cube_main.append(selected)
+        main = pd.concat(cube_main) if cube_main else cube.head(0)
+        main_parts.append(main)
+        remaining = cube.drop(index=main.index)
+        cube_reserve: list[pd.DataFrame] = []
+        for stratum in strata_names:
+            population = remaining[remaining.scalar_index_rank_stratum == stratum]
+            selected = _block_balanced_selection(
+                population, reserve_quotas[stratum], seed, "reserve", cube_id, stratum,
+            )
+            selected["cube_rank_stratum_requested"] = reserve_quotas[stratum]
+            cube_reserve.append(selected)
+        reserve_parts.append(pd.concat(cube_reserve) if cube_reserve else cube.head(0))
+    main = pd.concat(main_parts, ignore_index=False).copy()
+    reserve = pd.concat(reserve_parts, ignore_index=False).copy()
+    if set(main.index) & set(reserve.index):
+        raise ValueError("Main and reserve selections intersect")
+    for frame in (main, reserve):
+        frame["overall_inclusion_probability"] = (
+            frame["first_stage_inclusion_probability"] * frame["final_inclusion_probability"]
+        )
+        frame["design_weight"] = 1.0 / frame["overall_inclusion_probability"]
+        frame["sample_id"] = [
+            "f2-" + hashlib.sha256(f"{seed}:{row.cube_id}:{row.row}:{row.column}".encode()).hexdigest()[:20]
+            for row in frame.itertuples(index=False)
+        ]
+    return main.reset_index(drop=True), reserve.reset_index(drop=True)
 
 
 def stratified_deterministic_sample(
@@ -717,3 +838,125 @@ def validate_frozen_role_contract(project: Path, config: dict, contract_path: Pa
         if row["source_preview_checksums"] != preview_by_cube.get(row["cube_id"]):
             raise ValueError(f"Frozen preview-checksum reference changed: {row['cube_id']}")
     return {"contract": contract, "totals": totals}
+
+
+def validate_frozen_sampling_contract(project: Path, config: dict, contract_path: Path) -> dict:
+    """Validate the frozen main/reserve frames and their immutable contract."""
+    contract = yaml.safe_load(contract_path.read_text())
+    if contract.get("version") != "field2_blind_sampling_frame_contract_v1":
+        raise ValueError("Unknown frozen sampling-contract version")
+    if contract.get("status") != "field2_blind_sampling_frame_frozen":
+        raise ValueError("Field 2 blind sampling frame is not frozen")
+    commit = str(contract.get("materialization_git_commit", ""))
+    if len(commit) != 40 or any(character not in "0123456789abcdef" for character in commit):
+        raise ValueError("Sampling contract has no exact materialization Git commit")
+    if int(contract.get("seed", -1)) != int(config["sampling"]["seed"]):
+        raise ValueError("Sampling seed differs from the portable configuration")
+    provenance = contract.get("provenance", {})
+    reject_prediction_provenance(provenance)
+    required_false = (
+        "supervised_checkpoint_loaded", "predictions_or_probabilities_used", "pseudo_labels_used",
+        "embeddings_ssl_features_or_clusters_used", "existing_biological_masks_used",
+        "investigator_point_labels_used", "biological_classes_inferred_automatically",
+    )
+    if provenance.get("prediction_free") is not True or any(provenance.get(key) is not False for key in required_false):
+        raise ValueError("Sampling contract does not preserve prediction-free provenance")
+    policy = contract.get("reserve_release_policy", {})
+    if policy.get("status") != "locked_not_released_for_annotation":
+        raise ValueError("Reserve frame is not locked")
+    if policy.get("authorization_required") != "separate immutable reserve-release contract":
+        raise ValueError("Reserve frame lacks its separate-authorization requirement")
+    if policy.get("release_gates_after_800_main_reviews") != config["sampling"]["reserve_release_gates_after_800_main_reviews"]:
+        raise ValueError("Reserve release gates differ from the predeclared configuration")
+    if policy.get("may_not_depend_on") != config["sampling"]["reserve_release_prohibited_evidence"]:
+        raise ValueError("Reserve release prohibited-evidence rules changed")
+
+    inputs = contract.get("input_contracts", {})
+    role_path = _verified_contract_file(project, inputs.get("cube_role_contract", {}), "cube-role contract")
+    role_result = validate_frozen_role_contract(project, config, role_path)
+    _verified_contract_file(project, inputs.get("valid_support_manifest", {}), "valid-support manifest")
+    _verified_contract_file(project, inputs.get("review_package_manifest", {}), "review-package manifest")
+    if inputs.get("field2_source_manifest_sha256") != config["source_manifest_sha256"]:
+        raise ValueError("Field 2 source-manifest hash differs from the sampling contract")
+
+    outputs = contract.get("frozen_outputs", {})
+    verified = {
+        name: _verified_contract_file(project, outputs.get(name, {}), f"sampling output {name}")
+        for name in (
+            "main", "reserve", "combined", "allocation_audit", "stratum_block_audit",
+            "sampling_audit", "sampling_map",
+        )
+    }
+    main = pd.read_csv(verified["main"], keep_default_na=False)
+    reserve = pd.read_csv(verified["reserve"], keep_default_na=False)
+    combined = pd.read_csv(verified["combined"], keep_default_na=False)
+    expected_main, expected_reserve = int(config["sampling"]["expected_main_total"]), int(config["sampling"]["expected_reserve_total"])
+    if len(main) != expected_main or len(reserve) != expected_reserve or len(combined) != expected_main + expected_reserve:
+        raise ValueError("Frozen main/reserve sampling totals changed")
+    if set(main.sampling_frame) != {"main"} or set(reserve.sampling_frame) != {"reserve"}:
+        raise ValueError("Main or reserve table has the wrong frame label")
+    expected_combined = pd.concat([main, reserve], ignore_index=True)
+    if list(combined.columns) != list(expected_combined.columns) or not combined.equals(expected_combined):
+        raise ValueError("Combined sampling table differs from main plus reserve")
+    if combined.sample_id.nunique() != len(combined):
+        raise ValueError("Frozen sampling table contains duplicate sample IDs")
+    if combined.geographic_ground_cell_id.nunique() != len(combined):
+        raise ValueError("Frozen sampling table contains duplicate ground cells")
+    if set(main.sample_id) & set(reserve.sample_id):
+        raise ValueError("Frozen main and reserve frames intersect")
+    expected_ids = [
+        "f2-" + hashlib.sha256(f"{contract['seed']}:{row.cube_id}:{row.row}:{row.column}".encode()).hexdigest()[:20]
+        for row in combined.itertuples(index=False)
+    ]
+    if combined.sample_id.tolist() != expected_ids:
+        raise ValueError("Frozen sample IDs are not stable under the contract seed")
+    numeric = combined[["first_stage_inclusion_probability", "final_inclusion_probability", "overall_inclusion_probability", "design_weight"]].astype(float)
+    if not np.isfinite(numeric.to_numpy()).all() or not (numeric.to_numpy() > 0).all():
+        raise ValueError("Frozen sampling probabilities or weights are not finite and positive")
+    if not np.allclose(numeric.overall_inclusion_probability, numeric.first_stage_inclusion_probability * numeric.final_inclusion_probability):
+        raise ValueError("Overall inclusion probability definition changed")
+    if not np.allclose(numeric.design_weight, 1.0 / numeric.overall_inclusion_probability):
+        raise ValueError("Design-weight definition changed")
+    if set(reserve.reserve_release_status) != {"locked_pending_separate_authorization"}:
+        raise ValueError("Reserve table is not access-protected")
+
+    roles = {row["cube_id"]: row["primary_role"] for row in role_result["contract"]["cube_roles"]}
+    allocation = pd.read_csv(verified["allocation_audit"], keep_default_na=False)
+    if allocation.cube_id.astype(str).tolist() != list(config["expected_cube_ids"]):
+        raise ValueError("Frozen allocation audit has the wrong cube inventory")
+    for row in allocation.itertuples(index=False):
+        role = roles[str(row.cube_id)]
+        main_expected = int(config["sampling"]["main_points_per_cube_by_role"][role])
+        reserve_expected = int(config["sampling"]["reserve_points_per_cube_by_role"][role])
+        if (int(row.main_requested), int(row.main_achieved)) != (main_expected, main_expected):
+            raise ValueError(f"Main allocation changed: {row.cube_id}")
+        if (int(row.reserve_requested), int(row.reserve_achieved)) != (reserve_expected, reserve_expected):
+            raise ValueError(f"Reserve allocation changed: {row.cube_id}")
+        if int((main.cube_id == row.cube_id).sum()) != main_expected or int((reserve.cube_id == row.cube_id).sum()) != reserve_expected:
+            raise ValueError(f"Frozen point table allocation changed: {row.cube_id}")
+    audit = yaml.safe_load(verified["sampling_audit"].read_text())
+    if audit != contract.get("audit"):
+        raise ValueError("Frozen sampling audit differs from the sampling contract")
+    for _, group in combined.groupby("crs"):
+        if len(group) > 1:
+            distances, _ = cKDTree(group[["x", "y"]].astype(float).to_numpy()).query(group[["x", "y"]].astype(float).to_numpy(), k=2)
+            if float(distances[:, 1].min()) + 1e-9 < float(config["sampling"]["minimum_separation_m"]):
+                raise ValueError("Frozen sampling table violates minimum separation")
+    if audit.get("valid_support_violations") != 0 or audit.get("invalid_context_or_border_violations") != 0:
+        raise ValueError("Frozen sampling audit contains support or context violations")
+    if audit.get("duplicate_ground_cell_count") != 0 or audit.get("main_reserve_intersection") != 0:
+        raise ValueError("Frozen sampling audit contains duplicates or frame overlap")
+    return {"contract": contract, "main": main, "reserve": reserve, "combined": combined, "audit": audit}
+
+
+def require_main_sampling_frame(project: Path, config: dict) -> dict:
+    """Return only the released main frame; never expose the locked reserve path."""
+    contract_path = project / config["sampling"]["sampling_contract"]
+    result = validate_frozen_sampling_contract(project, config, contract_path)
+    if result["contract"]["reserve_release_policy"]["status"] != "locked_not_released_for_annotation":
+        raise RuntimeError("Reserve-frame protection is not active")
+    return {
+        "contract": result["contract"],
+        "main": result["main"],
+        "main_frame_sha256": result["contract"]["frozen_outputs"]["main"]["sha256"],
+    }

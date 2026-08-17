@@ -112,32 +112,60 @@ sampling:
   spatial_group_size_m: 5.0
   minimum_separation_m: 0.25
   geographic_ground_cell_size_m: 0.10
+  annotation_context_radius_preview_pixels: 110
   scalar_index_rank_strata:
     - rank_00_20
     - rank_20_40
     - rank_40_60
     - rank_60_80
     - rank_80_100
-  proposed_points_per_cube_by_role:
-    primary_three_class: 80
-    chickpea_absent_negative_control: 60
-    challenge_only: 100
-    sensitivity_only: 40
+  main_points_per_cube_by_role:
+    primary_three_class: 20
+    chickpea_absent_negative_control: 20
+    challenge_only: 25
+    sensitivity_only: 12
     exclude_with_reason: 0
-  proposed_counts_status: proposed_pending_investigator_role_freeze
-  repeated_view_reliability:
-    enabled: false
-    proposed_count: 0
+  reserve_points_per_cube_by_role:
+    primary_three_class: 10
+    chickpea_absent_negative_control: 10
+    challenge_only: 12
+    sensitivity_only: 6
+    exclude_with_reason: 0
+  allocation_status: predeclared_fixed_after_cube_role_freeze
   output_root: metadata/local/annotations/field2_blind_sampling
-  sampling_frame: metadata/local/annotations/field2_blind_sampling/field2_blind_annotation_sampling_frame.csv
+  main_frame: metadata/local/annotations/field2_blind_sampling/field2_blind_main_sampling_frame.csv
+  reserve_frame: metadata/local/annotations/field2_blind_sampling/field2_blind_reserve_sampling_frame.csv
+  combined_frame: metadata/local/annotations/field2_blind_sampling/field2_blind_combined_sampling_frame.csv
+  allocation_audit: metadata/local/reports/field2_blind_sampling/field2_blind_allocation_audit.csv
+  stratum_block_audit: metadata/local/reports/field2_blind_sampling/field2_blind_stratum_block_audit.csv
+  sampling_audit: metadata/local/reports/field2_blind_sampling/field2_blind_sampling_audit.yaml
+  sampling_map: metadata/local/reports/field2_blind_sampling/field2_blind_sampling_overview.png
   sampling_contract: metadata/local/contracts/field2_blind_sampling_frame_contract.yaml
+  expected_main_total: 800
+  expected_reserve_total: 396
+  reserve_release_policy: separate_immutable_authorization_required
+  reserve_release_gates_after_800_main_reviews:
+    confidently_labeled_chickpea_primary_and_challenge_minimum: 75
+    confidently_labeled_ordinary_weed_minimum: 100
+    confidently_labeled_tall_grass_weed_minimum: 75
+    confidently_labeled_soil_minimum: 100
+    chickpea_contributing_cubes_minimum: 4
+    tall_grass_weed_contributing_cubes_minimum: 4
+    primary_class_effective_design_weighted_sample_size_minimum: 50
+  reserve_release_requires_separate_immutable_authorization: true
+  reserve_release_prohibited_evidence:
+    - supervised_predictions
+    - observed_model_errors
+    - probabilities
+    - model_confidence
+    - preliminary_accuracy
 
 point_annotation:
   labels:
-    - soil
-    - weed
-    - tall_grass_weed
     - chickpea
+    - ordinary_weed
+    - tall_grass_weed
+    - soil
     - chickpea_soil_mixed
     - chickpea_weed_mixed
     - uncertain

@@ -31,19 +31,15 @@ def main() -> None:
         ["git", "cat-file", "-e", f"{contract['freeze_git_commit']}^{{commit}}"],
         cwd=project,
     )
-    sampling_frame = project / config["sampling"]["sampling_frame"]
-    sampling_contract = project / config["sampling"]["sampling_contract"]
     if contract.get("blind_point_sampling_frame_generated") is not False:
-        raise ValueError("Role contract does not declare the blind sampling frame absent")
-    if sampling_frame.exists() or sampling_contract.exists():
-        raise ValueError("Blind point-sampling output exists during role-contract validation")
+        raise ValueError("Role contract does not preserve the no-sampling state at role-freeze time")
     print("Field 2 frozen cube-role contract validation passed")
     print(f"Contract: {contract_path}")
     print(f"Contract SHA-256: {sha256(contract_path)}")
     print(f"Freeze commit: {contract['freeze_git_commit']}")
     print(f"Role totals: {result['totals']['primary_roles']}")
     print(f"Biological-flag totals: {result['totals']['biological_flags']}")
-    print("Blind point-sampling frame: absent")
+    print("Role-freeze provenance: blind point-sampling frame was absent at role freeze")
 
 
 if __name__ == "__main__":

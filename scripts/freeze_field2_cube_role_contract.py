@@ -53,7 +53,9 @@ def main() -> None:
     if existing_outputs:
         raise SystemExit(f"REFUSED: immutable freeze output already exists: {existing_outputs}")
     forbidden_sampling_outputs = [
-        project / config["sampling"]["sampling_frame"],
+        project / config["sampling"]["main_frame"],
+        project / config["sampling"]["reserve_frame"],
+        project / config["sampling"]["combined_frame"],
         project / config["sampling"]["sampling_contract"],
     ]
     if any(path.exists() for path in forbidden_sampling_outputs):
@@ -152,8 +154,9 @@ def main() -> None:
         },
         "field2_valid_support_manifest_sha256": sha256(support_manifest_path),
         "field2_source_manifest_sha256": valid_contract["source_manifest_sha256"],
-        "proposed_sampling_counts": config["sampling"]["proposed_points_per_cube_by_role"],
-        "proposed_sampling_counts_status": config["sampling"]["proposed_counts_status"],
+        "predeclared_main_sampling_counts": config["sampling"]["main_points_per_cube_by_role"],
+        "predeclared_reserve_sampling_counts": config["sampling"]["reserve_points_per_cube_by_role"],
+        "sampling_allocation_status": config["sampling"]["allocation_status"],
         "provenance": provenance,
         "blind_point_sampling_frame_generated": False,
         "field2_categorical_labels_generated": False,
