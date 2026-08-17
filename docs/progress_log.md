@@ -879,3 +879,20 @@ corrections.
   Freeze and sampling were not run, and the point annotator was not launched.
 - No checkpoint, prediction, probability, Field 1 label, automatic biological
   role, Field 2 categorical label, or training operation entered this work.
+
+
+### Investigator-reviewed Field 2 cube roles frozen
+
+- Froze review revision 86 only after exact JSON/CSV agreement, 40/40 reviewed
+  records, logical/audit passes, preview rehashing, and frozen source/support
+  contract validation. No investigator decision was inferred or altered.
+- Frozen roles comprise 20 primary three-class, 8 challenge-only, 7
+  chickpea-absent negative-control, and 5 sensitivity-only cubes, with no
+  excluded or unreviewed cubes. All 40 confidence values are high.
+- Added a write-once contract, frozen role table, biological-support summary,
+  visual overview, and a validator that cross-checks every hashed input/output
+  and detects later input or contract mutation.
+- The contract records freeze implementation commit `bcfefaa4bb702879e95fbaec297fd18d6e7b6afe`
+  and SHA-256 `a76425dd259f4fb245db6d51824a99d4f960e044ca5aab2cfc114578bcf06c96`.
+- The blind point-sampling frame and sampling contract remain absent. No point
+  annotator, inference, pseudo-labeling, training, or model selection ran.
