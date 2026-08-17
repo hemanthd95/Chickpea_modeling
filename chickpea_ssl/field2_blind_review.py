@@ -16,6 +16,8 @@ from typing import Iterable
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from PIL import Image
+import rasterio
 from scipy.stats import rankdata
 from scipy.spatial import cKDTree
 import yaml
@@ -66,6 +68,82 @@ PREVIEW_LAYERS = (
     "valid_support",
     "support_outline",
 )
+
+
+def select_natural_rgb_bands(
+    wavelengths: np.ndarray,
+    targets_nm: dict[str, float],
+    maximum_difference_nm: float,
+) -> dict[str, dict[str, float | int]]:
+    """Select deterministic nearest reflectance bands for red, green, and blue."""
+    observed = np.asarray(wavelengths, dtype=float)
+    if observed.ndim != 1 or not len(observed) or not np.isfinite(observed).all():
+        raise ValueError("Natural RGB requires finite one-dimensional wavelengths")
+    if list(targets_nm) != ["red", "green", "blue"]:
+        raise ValueError("Natural RGB targets must be ordered red, green, blue")
+    selected = {}
+    for channel, target in targets_nm.items():
+        index = int(np.argmin(np.abs(observed - float(target))))
+        actual = float(observed[index])
+        difference = abs(actual - float(target))
+        if difference > maximum_difference_nm:
+            raise ValueError(
+                f"No {channel} band is within {maximum_difference_nm} nm of {target} nm",
+            )
+        selected[channel] = {
+            "python_band_index_0_based": index,
+            "envi_band_number_1_based": index + 1,
+            "target_wavelength_nm": float(target),
+            "selected_wavelength_nm": actual,
+            "absolute_difference_nm": difference,
+        }
+    if len({value["python_band_index_0_based"] for value in selected.values()}) != 3:
+        raise ValueError("Natural RGB resolved duplicate channel bands")
+    return selected
+
+
+def render_natural_rgb_uint8(
+    reflectance: np.ndarray,
+    valid_support: np.ndarray,
+    selected_bands: dict[str, dict[str, float | int]],
+    percentiles: tuple[float, float] = (2.0, 98.0),
+) -> tuple[np.ndarray, dict[str, dict[str, float]]]:
+    """Apply one deterministic cube-level channel stretch inside frozen support."""
+    if reflectance.ndim != 3 or valid_support.shape != reflectance.shape[:2]:
+        raise ValueError("Reflectance and valid-support dimensions differ")
+    low_percentile, high_percentile = map(float, percentiles)
+    if not 0 <= low_percentile < high_percentile <= 100:
+        raise ValueError("Natural RGB stretch percentiles are invalid")
+    result = np.zeros((*valid_support.shape, 3), dtype=np.uint8)
+    stretch = {}
+    for output_index, channel in enumerate(("red", "green", "blue")):
+        band_index = int(selected_bands[channel]["python_band_index_0_based"])
+        plane = np.asarray(reflectance[..., band_index], dtype=np.float64)
+        usable = plane[valid_support & np.isfinite(plane)]
+        if not len(usable):
+            raise ValueError(f"Natural RGB {channel} channel has no finite supported pixels")
+        low, high = np.percentile(usable, [low_percentile, high_percentile])
+        if not np.isfinite(low) or not np.isfinite(high) or high <= low:
+            raise ValueError(f"Natural RGB {channel} stretch is degenerate")
+        scaled = np.clip((plane - low) / (high - low), 0.0, 1.0)
+        channel_uint8 = np.rint(scaled * 255.0).astype(np.uint8)
+        channel_uint8[~valid_support | ~np.isfinite(plane)] = 0
+        result[..., output_index] = channel_uint8
+        stretch[channel] = {
+            "low_percentile": low_percentile,
+            "high_percentile": high_percentile,
+            "low_value": float(low),
+            "high_value": float(high),
+        }
+    return result, stretch
+
+
+def natural_rgb_png_bytes(rgb: np.ndarray) -> bytes:
+    if rgb.dtype != np.uint8 or rgb.ndim != 3 or rgb.shape[2] != 3:
+        raise ValueError("Natural RGB PNG input must be H×W×3 uint8")
+    buffer = io.BytesIO()
+    Image.fromarray(rgb, mode="RGB").save(buffer, format="PNG", optimize=False, compress_level=6)
+    return buffer.getvalue()
 
 
 def utc_now() -> str:
@@ -960,3 +1038,89 @@ def require_main_sampling_frame(project: Path, config: dict) -> dict:
         "main": result["main"],
         "main_frame_sha256": result["contract"]["frozen_outputs"]["main"]["sha256"],
     }
+
+
+def validate_annotation_display_contract(project: Path, config: dict, contract_path: Path) -> dict:
+    """Validate the immutable natural-RGB annotation-display addendum."""
+    contract = yaml.safe_load(contract_path.read_text())
+    display = config["annotation_display"]
+    if contract.get("version") != "field2_annotation_display_addendum_v1":
+        raise ValueError("Unknown annotation-display contract version")
+    if contract.get("status") != "field2_annotation_display_natural_rgb_frozen":
+        raise ValueError("Natural RGB annotation display is not frozen")
+    if contract.get("display_recipe_version") != display["version"]:
+        raise ValueError("Annotation-display recipe version changed")
+    if display.get("default_layer") != "natural_rgb":
+        raise ValueError("Natural RGB is not the configured default annotation layer")
+    commit = str(contract.get("materialization_git_commit", ""))
+    if len(commit) != 40 or any(character not in "0123456789abcdef" for character in commit):
+        raise ValueError("Annotation-display contract has no exact materialization commit")
+    if contract.get("cube_ids") != list(config["expected_cube_ids"]) or contract.get("cube_count") != 40:
+        raise ValueError("Annotation-display contract has the wrong cube inventory")
+    provenance = contract.get("provenance", {})
+    reject_prediction_provenance(provenance)
+    required_true = ("display_only", "prediction_free", "reflectance_and_frozen_valid_support_only")
+    required_false = (
+        "pca_used_to_construct_rgb", "stored_scalar_index_used_to_construct_rgb",
+        "field1_labels_or_model_outputs_used", "supervised_checkpoint_loaded",
+        "predictions_probabilities_or_pseudo_labels_generated", "biological_class_suggested",
+    )
+    if any(provenance.get(key) is not True for key in required_true) or any(
+        provenance.get(key) is not False for key in required_false
+    ):
+        raise ValueError("Annotation-display provenance is not prediction-free reflectance-only")
+    inputs = contract.get("input_contracts", {})
+    _verified_contract_file(project, inputs.get("valid_support_contract", {}), "display valid-support contract")
+    valid_manifest_path = _verified_contract_file(project, inputs.get("valid_support_manifest", {}), "display valid-support manifest")
+    sampling_path = _verified_contract_file(project, inputs.get("sampling_contract", {}), "display sampling contract")
+    sampling_result = validate_frozen_sampling_contract(project, config, sampling_path)
+    if inputs.get("field2_source_manifest_sha256") != config["source_manifest_sha256"]:
+        raise ValueError("Display source-manifest hash changed")
+    for name in ("main", "reserve", "combined"):
+        expected_hash = sampling_result["contract"]["frozen_outputs"][name]["sha256"]
+        if contract.get("sampling_table_sha256", {}).get(name) != expected_hash:
+            raise ValueError(f"Display addendum has the wrong frozen {name} sampling hash")
+    manifest_path = _verified_contract_file(project, contract.get("preview_manifest", {}), "natural RGB manifest")
+    manifest = pd.read_csv(manifest_path, keep_default_na=False)
+    expected_ids = list(config["expected_cube_ids"])
+    if len(manifest) != 40 or manifest.cube_id.astype(str).tolist() != expected_ids or manifest.cube_id.nunique() != 40:
+        raise ValueError("Natural RGB manifest does not contain exactly the ordered 40 cubes")
+    contract_rows = {row["cube_id"]: row for row in contract.get("cube_displays", [])}
+    if list(contract_rows) != expected_ids:
+        raise ValueError("Natural RGB contract rows differ from the 40-cube inventory")
+    support_manifest = pd.read_csv(valid_manifest_path, keep_default_na=False).set_index("cube_id")
+    targets = {name: float(value) for name, value in display["rgb_target_wavelengths_nm"].items()}
+    tolerance = float(display["maximum_wavelength_difference_nm"])
+    for row in manifest.itertuples(index=False):
+        cube_id = str(row.cube_id)
+        path = (project / str(row.natural_rgb_path)).resolve()
+        if not path.is_file() or sha256(path) != str(row.natural_rgb_sha256):
+            raise ValueError(f"Natural RGB preview changed: {cube_id}")
+        frozen = contract_rows[cube_id]
+        if frozen.get("natural_rgb_sha256") != str(row.natural_rgb_sha256):
+            raise ValueError(f"Natural RGB contract hash differs: {cube_id}")
+        selected = json.loads(str(row.selected_bands_json))
+        if selected != frozen.get("selected_bands"):
+            raise ValueError(f"Natural RGB selected bands differ: {cube_id}")
+        for channel in ("red", "green", "blue"):
+            item = selected[channel]
+            if item["target_wavelength_nm"] != targets[channel]:
+                raise ValueError(f"Natural RGB target changed: {cube_id}:{channel}")
+            if abs(item["selected_wavelength_nm"] - targets[channel]) > tolerance:
+                raise ValueError(f"Natural RGB selected wavelength is out of tolerance: {cube_id}:{channel}")
+            if int(item["envi_band_number_1_based"]) != int(item["python_band_index_0_based"]) + 1:
+                raise ValueError(f"Natural RGB band-index convention changed: {cube_id}:{channel}")
+        support_row = support_manifest.loc[cube_id]
+        if str(row.support_mask_sha256) != str(support_row.mask_sha256):
+            raise ValueError(f"Natural RGB support-mask reference changed: {cube_id}")
+        if str(row.source_reflectance_sha256) != str(support_row.source_reflectance_sha256):
+            raise ValueError(f"Natural RGB reflectance reference changed: {cube_id}")
+        image = np.asarray(Image.open(path).convert("RGB"), dtype=np.uint8)
+        with rasterio.Env(GDAL_PAM_ENABLED="NO"):
+            with rasterio.open(project / str(support_row.mask_path), "r") as dataset:
+                support = dataset.read(1) == 1
+        if image.shape[:2] != support.shape or np.any(image[~support] != 0):
+            raise ValueError(f"Natural RGB contains nonblack pixels outside frozen support: {cube_id}")
+        if str(row.outside_support_black).lower() != "true" or str(row.reflectance_only).lower() != "true":
+            raise ValueError(f"Natural RGB manifest provenance changed: {cube_id}")
+    return {"contract": contract, "manifest": manifest, "sampling": sampling_result}

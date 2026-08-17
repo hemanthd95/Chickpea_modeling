@@ -24,14 +24,18 @@ import yaml
 
 from chickpea_ssl.field2_blind_review import (
     CONFIDENCE_VALUES, POINT_LABELS, atomic_write_bytes,
-    atomic_write_json, require_main_sampling_frame, verify_preview_hashes,
+    atomic_write_json, require_main_sampling_frame, validate_annotation_display_contract,
+    verify_preview_hashes,
 )
+from chickpea_ssl.field2_readiness import sha256
 
 
 ANNOTATION_COLUMNS = [
     "sample_id", "cube_id", "frozen_cube_role", "selected_label", "confidence",
     "investigator_note", "reviewed", "review_timestamp", "reviewer_identifier",
     "role_contradiction", "source_preview_checksums", "sampling_frame_sha256",
+    "annotation_display_version", "annotation_display_contract_sha256",
+    "natural_rgb_preview_sha256", "requires_visual_rereview",
 ]
 
 
@@ -39,7 +43,13 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def default_annotation(row, frame_hash: str) -> dict:
+def default_annotation(
+    row,
+    frame_hash: str,
+    display_version: str,
+    display_contract_hash: str,
+    natural_rgb_hash: str,
+) -> dict:
     return {
         "sample_id": str(row.sample_id), "cube_id": str(row.cube_id),
         "frozen_cube_role": str(row.cube_evaluation_role), "selected_label": "",
@@ -47,6 +57,10 @@ def default_annotation(row, frame_hash: str) -> dict:
         "review_timestamp": "", "reviewer_identifier": "", "role_contradiction": False,
         "source_preview_checksums": json.loads(str(row.source_preview_checksums)),
         "sampling_frame_sha256": frame_hash,
+        "annotation_display_version": display_version,
+        "annotation_display_contract_sha256": display_contract_hash,
+        "natural_rgb_preview_sha256": natural_rgb_hash,
+        "requires_visual_rereview": False,
     }
 
 
@@ -62,8 +76,19 @@ def annotation_csv_bytes(payload: dict) -> bytes:
 class PointAnnotationStore:
     """Atomic, resumable, main-frame-only annotation state."""
 
-    def __init__(self, project: Path, main_frame: pd.DataFrame, frame_hash: str, manifest_path: Path, output_root: Path):
+    def __init__(
+        self,
+        project: Path,
+        main_frame: pd.DataFrame,
+        frame_hash: str,
+        manifest_path: Path,
+        natural_rgb_manifest: pd.DataFrame,
+        display_version: str,
+        display_contract_hash: str,
+        output_root: Path,
+    ):
         self.project = project.resolve(); self.frame = main_frame.copy(); self.frame_hash = frame_hash
+        self.display_version = display_version; self.display_contract_hash = display_contract_hash
         if set(self.frame.sampling_frame) != {"main"} or len(self.frame) != 800:
             raise ValueError("Point annotator accepts only the exact frozen 800-point main frame")
         self.sample_order = self.frame.sample_id.astype(str).tolist()
@@ -73,6 +98,11 @@ class PointAnnotationStore:
         if preview_issues:
             raise ValueError(f"Prediction-free preview checksum validation failed: {preview_issues}")
         self.manifest = {str(row.cube_id): row for row in self.manifest_frame.itertuples(index=False)}
+        if natural_rgb_manifest.cube_id.astype(str).tolist() != self.manifest_frame.cube_id.astype(str).tolist():
+            raise ValueError("Natural RGB manifest differs from the 40-cube review manifest")
+        self.natural_rgb = {
+            str(row.cube_id): row for row in natural_rgb_manifest.itertuples(index=False)
+        }
         self.output_root = output_root.resolve(); self.output_root.mkdir(parents=True, exist_ok=True)
         self.json_path = self.output_root / "field2_blind_main_point_annotations.json"
         self.csv_path = self.output_root / "field2_blind_main_point_annotations.csv"
@@ -84,18 +114,53 @@ class PointAnnotationStore:
         return {
             "version": "field2_blind_main_point_annotations_v1", "revision": 0,
             "sampling_frame_sha256": self.frame_hash, "sample_order": self.sample_order,
+            "annotation_display_version": self.display_version,
+            "annotation_display_contract_sha256": self.display_contract_hash,
             "automatic_metadata": {
                 "biological_labels_assigned_automatically": False,
                 "reserve_frame_exposed": False, "predictions_or_probabilities_used": False,
             },
             "annotations": {
-                sample_id: default_annotation(self.by_sample[sample_id], self.frame_hash)
+                sample_id: default_annotation(
+                    self.by_sample[sample_id], self.frame_hash, self.display_version,
+                    self.display_contract_hash,
+                    str(self.natural_rgb[str(self.by_sample[sample_id].cube_id)].natural_rgb_sha256),
+                )
                 for sample_id in self.sample_order
             },
         }
 
+    def migrate_display_version(self, payload: dict) -> tuple[dict, int]:
+        """Preserve annotations while marking old reviewed records for visual re-review."""
+        migrated = json.loads(json.dumps(payload))
+        prior_version = migrated.get("annotation_display_version", "")
+        reviewed_requiring_rereview = 0
+        migrated["annotation_display_version"] = self.display_version
+        migrated["annotation_display_contract_sha256"] = self.display_contract_hash
+        for sample_id in self.sample_order:
+            record = migrated["annotations"][sample_id]
+            old_record_version = record.get("annotation_display_version", prior_version)
+            requires = bool(record.get("reviewed")) and old_record_version != self.display_version
+            record["annotation_display_version"] = self.display_version
+            record["annotation_display_contract_sha256"] = self.display_contract_hash
+            record["natural_rgb_preview_sha256"] = str(
+                self.natural_rgb[str(record["cube_id"])].natural_rgb_sha256
+            )
+            record["requires_visual_rereview"] = requires or bool(
+                record.get("requires_visual_rereview", False)
+            )
+            reviewed_requiring_rereview += int(record["requires_visual_rereview"])
+        migrated["automatic_metadata"] = {
+            "biological_labels_assigned_automatically": False,
+            "reserve_frame_exposed": False,
+            "predictions_or_probabilities_used": False,
+            "display_version_migration_changed_biological_labels": False,
+        }
+        return migrated, reviewed_requiring_rereview
+
     def load(self) -> dict:
         payload = json.loads(self.json_path.read_text()) if self.json_path.exists() else self.initial_payload()
+        payload, _ = self.migrate_display_version(payload)
         self.validate(payload)
         return payload
 
@@ -104,6 +169,10 @@ class PointAnnotationStore:
             raise ValueError("Unknown point-annotation schema version")
         if payload.get("sampling_frame_sha256") != self.frame_hash or payload.get("sample_order") != self.sample_order:
             raise ValueError("Point annotations differ from the frozen main frame")
+        if payload.get("annotation_display_version") != self.display_version:
+            raise ValueError("Point annotations use the wrong annotation-display version")
+        if payload.get("annotation_display_contract_sha256") != self.display_contract_hash:
+            raise ValueError("Point annotations use the wrong annotation-display contract")
         annotations = payload.get("annotations")
         if not isinstance(annotations, dict) or list(annotations) != self.sample_order:
             raise ValueError("Point annotation inventory is missing, duplicated, reordered, or contains reserve samples")
@@ -125,6 +194,11 @@ class PointAnnotationStore:
             expected_contradiction = label == "chickpea" and row.cube_evaluation_role == "chickpea_absent_negative_control"
             if record.get("role_contradiction") is not expected_contradiction: item_issues.append("role_contradiction_mismatch")
             if record.get("sampling_frame_sha256") != self.frame_hash: item_issues.append("sampling_frame_hash_mismatch")
+            if record.get("annotation_display_version") != self.display_version: item_issues.append("annotation_display_version_mismatch")
+            if record.get("annotation_display_contract_sha256") != self.display_contract_hash: item_issues.append("annotation_display_contract_mismatch")
+            expected_rgb_hash = str(self.natural_rgb[str(row.cube_id)].natural_rgb_sha256)
+            if record.get("natural_rgb_preview_sha256") != expected_rgb_hash: item_issues.append("natural_rgb_preview_hash_mismatch")
+            if not isinstance(record.get("requires_visual_rereview"), bool): item_issues.append("requires_visual_rereview_must_be_boolean")
             expected_previews = json.loads(str(row.source_preview_checksums))
             if record.get("source_preview_checksums") != expected_previews: item_issues.append("source_preview_checksums_mismatch")
             for key in ("investigator_note", "review_timestamp", "reviewer_identifier"):
@@ -167,32 +241,48 @@ class PointAnnotationStore:
             preview_issues = verify_preview_hashes(self.manifest_frame, self.project)
             if preview_issues: raise ValueError(f"Preview checksums changed: {preview_issues}")
             saved = json.loads(json.dumps(payload)); saved["revision"] = current["revision"] + 1; saved["updated_utc"] = utc_now()
-            saved["automatic_metadata"] = {"biological_labels_assigned_automatically": False, "reserve_frame_exposed": False, "predictions_or_probabilities_used": False}
+            saved["automatic_metadata"] = {"biological_labels_assigned_automatically": False, "reserve_frame_exposed": False, "predictions_or_probabilities_used": False, "display_version_migration_changed_biological_labels": False}
             atomic_write_json(self.json_path, saved); atomic_write_bytes(self.csv_path, annotation_csv_bytes(saved)); atomic_write_bytes(self.audit_path, self._audit_bytes(saved, issues)); self._write_overview(saved)
             reviewed = sum(record["reviewed"] for record in saved["annotations"].values())
             return len(saved["annotations"]), reviewed, saved["revision"]
 
     def public_manifest(self) -> dict:
-        return {cube_id: {"preview_step": int(row.preview_step)} for cube_id, row in self.manifest.items()}
+        result = {}
+        for cube_id, row in self.manifest.items():
+            rgb = self.natural_rgb[cube_id]
+            selected = json.loads(str(rgb.selected_bands_json))
+            result[cube_id] = {
+                "preview_step": int(row.preview_step), "natural_rgb_preview_step": 1,
+                "natural_rgb_width": int(rgb.width), "natural_rgb_height": int(rgb.height),
+                "natural_rgb_wavelengths_nm": {
+                    channel: selected[channel]["selected_wavelength_nm"]
+                    for channel in ("red", "green", "blue")
+                },
+            }
+        return result
 
     def layer_path(self, cube_id: str, layer: str) -> Path:
-        if cube_id not in self.manifest or layer not in {"false_colour", "pca", "stored_index", "support_outline"}:
+        if cube_id not in self.manifest or layer not in {"natural_rgb", "false_colour", "pca", "stored_index", "support_outline"}:
             raise KeyError((cube_id, layer))
+        if layer == "natural_rgb":
+            return self.project / str(self.natural_rgb[cube_id].natural_rgb_path)
         return self.project / str(getattr(self.manifest[cube_id], f"{layer}_path"))
 
 
 HTML = r'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Field 2 blind MAIN point annotator</title>
-<style>:root{color-scheme:dark;font-family:system-ui,sans-serif}*{box-sizing:border-box}body{margin:0;background:#101418;color:#edf2f7}header{padding:9px 12px;background:#182028;position:sticky;top:0;z-index:5;border-bottom:1px solid #3f4b56}.bar{display:flex;flex-wrap:wrap;gap:7px;align-items:center}button,select,input,textarea{font:inherit;color:inherit;background:#26313b;border:1px solid #52606d;border-radius:5px;padding:6px}.primary{background:#18794e}.danger{background:#7f1d1d}.layout{display:grid;grid-template-columns:minmax(0,1fr) 390px;height:calc(100vh - 120px)}.stage{display:grid;place-items:center;overflow:hidden;background:#050708}canvas{max-width:96%;max-height:96%;border:1px solid #52606d;image-rendering:auto}.form{padding:12px;overflow:auto;background:#151b21}.field{display:block;margin:8px 0}.field span{display:block;color:#b9c4ce;font-size:.84rem}.form textarea,.form input,.form select{width:100%}#status{padding-top:7px}.dirty,.warning{color:#ffd166}.help{font-size:.78rem;color:#b9c4ce}.metadata{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:.8rem}@media(max-width:900px){.layout{grid-template-columns:1fr;height:auto}.stage{height:60vh}}</style></head><body>
-<header><div class="bar"><button id="prev">← Previous</button><span id="counter"></span><button id="next">Next →</button><label>Cube <select id="cubeFilter"></select></label><label>Role <select id="roleFilter"></select></label><label>View <select id="layer"><option value="false_colour">Reflectance</option><option value="pca">PCA</option><option value="stored_index">Stored scalar index</option><option value="support_outline">Support boundary</option></select></label><label>Context <select id="context"><option value="close">Close</option><option value="medium">Medium</option></select></label><button id="save" class="primary">Save all</button></div><div id="status">Loading frozen MAIN frame…</div><div class="help">Shortcuts: ←/→ navigate · F/P/I/B views · Z toggles context · Ctrl/Cmd+S saves. Label the center pixel at the crosshair; context is supporting evidence only.</div></header>
-<div class="layout"><div class="stage"><canvas id="canvas"></canvas></div><aside class="form"><h3>Investigator annotation</h3><label class="field"><span>Selected label (no default)</span><select id="label"><option value="">Unlabeled</option></select></label><label class="field"><span>Confidence</span><select id="confidence"><option value="">Not set</option></select></label><label class="field"><span>Reviewer identifier (optional)</span><input id="reviewer"></label><label class="field"><span>Investigator note (optional)</span><textarea id="note"></textarea></label><button id="review" class="primary">Mark reviewed</button> <button id="clear" class="danger">Clear current</button><p id="contradiction" class="warning"></p><h3>Frozen sample metadata</h3><div id="metadata" class="metadata"></div><p class="help">Mixed labels apply only when the central pixel is spatially mixed. Uncertainty is preferable to a forced class. Chickpea remains available on negative-control cubes; selecting it records a role contradiction without changing the frozen cube role. Reserve samples are locked and unavailable here.</p></aside></div>
+<style>:root{color-scheme:dark;font-family:system-ui,sans-serif}*{box-sizing:border-box}body{margin:0;background:#101418;color:#edf2f7}header{padding:9px 12px;background:#182028;position:sticky;top:0;z-index:5;border-bottom:1px solid #3f4b56}.bar{display:flex;flex-wrap:wrap;gap:7px;align-items:center}button,select,input,textarea{font:inherit;color:inherit;background:#26313b;border:1px solid #52606d;border-radius:5px;padding:6px}.primary{background:#18794e}.danger{background:#7f1d1d}.layout{display:grid;grid-template-columns:minmax(0,1fr) 390px;height:calc(100vh - 126px)}.stage{display:grid;grid-template-columns:minmax(260px,1fr) minmax(320px,1.15fr);gap:10px;padding:10px;overflow:auto;background:#050708}.panel{display:flex;min-width:0;flex-direction:column;align-items:center;justify-content:center;gap:5px}.panel-title{font-size:.8rem;color:#b9c4ce}canvas{display:block;max-width:100%;max-height:calc(100vh - 190px);border:1px solid #52606d;background:#000}.overview{image-rendering:auto}.detail{image-rendering:pixelated}.form{padding:12px;overflow:auto;background:#151b21}.field{display:block;margin:8px 0}.field span{display:block;color:#b9c4ce;font-size:.84rem}.form textarea,.form input,.form select{width:100%}#status{padding-top:7px}.dirty,.warning{color:#ffd166}.rereview{color:#ff9f1c}.help{font-size:.78rem;color:#b9c4ce}.metadata{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:.8rem}@media(max-width:1100px){.stage{grid-template-columns:1fr}.layout{grid-template-columns:minmax(0,1fr) 350px}canvas{max-height:42vh}}@media(max-width:760px){.layout{grid-template-columns:1fr;height:auto}.form{max-height:none}}</style></head><body>
+<header><div class="bar"><button id="prev">← Previous</button><span id="counter"></span><button id="next">Next →</button><label>Cube <select id="cubeFilter"></select></label><label>Role <select id="roleFilter"></select></label><label>Review <select id="reviewFilter"><option value="">All records</option><option value="rereview">Requires visual re-review</option></select></label><label>View <select id="layer"><option value="natural_rgb">Natural RGB (default)</option><option value="false_colour">False colour reflectance</option><option value="pca">PCA</option><option value="stored_index">Stored scalar index</option><option value="support_outline">Support boundary</option></select></label><label>Zoom <select id="zoom"><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select></label><label><input id="grid" type="checkbox"> Pixel grid ≥8×</label><button id="save" class="primary">Save all</button></div><div id="status">Loading frozen MAIN frame…</div><div class="help">Shortcuts: ←/→ navigate · N/F/P/I/B views · 2/4/8/X zoom · G grid · Ctrl/Cmd+S saves. The outlined square is the exact sampled pixel; surrounding pixels are context only.</div></header>
+<div class="layout"><div class="stage"><section class="panel"><div class="panel-title">Complete cube overview</div><canvas id="overview" class="overview"></canvas></section><section class="panel"><div class="panel-title">Magnified sampled-pixel neighborhood</div><canvas id="detail" class="detail" width="640" height="640"></canvas></section></div><aside class="form"><h3>Investigator annotation</h3><label class="field"><span>Selected label (no default)</span><select id="label"><option value="">Unlabeled</option></select></label><label class="field"><span>Confidence</span><select id="confidence"><option value="">Not set</option></select></label><label class="field"><span>Reviewer identifier (optional)</span><input id="reviewer"></label><label class="field"><span>Investigator note (optional)</span><textarea id="note"></textarea></label><button id="review" class="primary">Mark reviewed</button> <button id="clear" class="danger">Clear current</button><p id="rereview" class="rereview"></p><p id="contradiction" class="warning"></p><h3>Frozen sample metadata</h3><div id="metadata" class="metadata"></div><p class="help">Mixed labels apply only when the sampled pixel is spatially mixed. Uncertainty is preferable to a forced class. Chickpea remains available on negative-control cubes; selecting it records a role contradiction without changing the frozen cube role. Reserve samples are locked and unavailable here.</p></aside></div>
 <script>
-const $=id=>document.getElementById(id),canvas=$('canvas'),ctx=canvas.getContext('2d');let samples=[],visible=[],manifest={},schema={},state={},index=0,image=new Image(),dirty=false;function sample(){return visible[index]}function record(){return state.annotations[sample().sample_id]}function status(x,bad=dirty){$('status').textContent=x;$('status').className=bad?'dirty':''}function setDirty(){dirty=true;status('UNSAVED changes — use Save all.',true)}
-function filter(){const cube=$('cubeFilter').value,role=$('roleFilter').value,current=sample()?.sample_id;visible=samples.filter(s=>(!cube||s.cube_id===cube)&&(!role||s.cube_evaluation_role===role));index=Math.max(0,visible.findIndex(s=>s.sample_id===current));if(index<0)index=0;if(!visible.length){status('No MAIN samples match this filter.',true);return}load()}
-function render(){const s=sample(),r=record(),m=manifest[s.cube_id],step=+m.preview_step,cx=(+s.column+.5)/step,cy=(+s.row+.5)/step,half=$('context').value==='close'?45:110;canvas.width=half*2;canvas.height=half*2;ctx.drawImage(image,cx-half,cy-half,half*2,half*2,0,0,half*2,half*2);ctx.strokeStyle='#ff2d55';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(half-14,half);ctx.lineTo(half+14,half);ctx.moveTo(half,half-14);ctx.lineTo(half,half+14);ctx.stroke();$('counter').textContent=(index+1)+' / '+visible.length+' filtered · '+Object.values(state.annotations).filter(x=>x.reviewed).length+'/800 reviewed';$('label').value=r.selected_label;$('confidence').value=r.confidence;$('reviewer').value=r.reviewer_identifier;$('note').value=r.investigator_note;$('review').textContent=r.reviewed?'Reviewed ✓':'Mark reviewed';$('contradiction').textContent=r.role_contradiction?'ROLE CONTRADICTION RECORDED: investigator selected chickpea on a frozen absent-negative-control cube.':'';$('metadata').textContent=`sample ID: ${s.sample_id}\ncube ID: ${s.cube_id}\nfrozen cube role: ${s.cube_evaluation_role}\ncube notes: ${s.cube_investigator_notes||'(none)'}\nrank stratum: ${s.scalar_index_rank_stratum}\nspatial block: ${s.spatial_group_id}\nframe: MAIN only`;status(`${s.sample_id} · ${r.reviewed?'REVIEWED':'not reviewed'} · ${r.selected_label||'unlabeled'}${dirty?' · UNSAVED':''}`,dirty)}
-function load(){const s=sample();if(!s)return;image.onload=render;image.onerror=()=>status('Prediction-free preview failed to load.',true);image.src='/layers/'+s.cube_id+'/'+$('layer').value+'.png?v='+Date.now()}function move(d){index=Math.max(0,Math.min(visible.length-1,index+d));load()}function update(){const s=sample(),r=record();r.selected_label=$('label').value;r.confidence=$('confidence').value;r.reviewer_identifier=$('reviewer').value.trim();r.investigator_note=$('note').value;r.role_contradiction=r.selected_label==='chickpea'&&s.cube_evaluation_role==='chickpea_absent_negative_control';r.reviewed=false;r.review_timestamp='';setDirty();render()}
-$('prev').onclick=()=>move(-1);$('next').onclick=()=>move(1);$('cubeFilter').onchange=filter;$('roleFilter').onchange=filter;$('layer').onchange=load;$('context').onchange=render;for(const id of ['label','confidence','reviewer','note'])$(id).addEventListener('change',update);$('review').onclick=()=>{const r=record();update();if(!r.selected_label||!r.confidence){status('Select a label and confidence before marking reviewed.',true);return}r.reviewed=true;r.review_timestamp=new Date().toISOString();setDirty();render()};$('clear').onclick=()=>{if(!confirm('Clear this MAIN annotation?'))return;const s=sample();state.annotations[s.sample_id]={sample_id:s.sample_id,cube_id:s.cube_id,frozen_cube_role:s.cube_evaluation_role,selected_label:'',confidence:'',investigator_note:'',reviewed:false,review_timestamp:'',reviewer_identifier:'',role_contradiction:false,source_preview_checksums:JSON.parse(s.source_preview_checksums),sampling_frame_sha256:state.sampling_frame_sha256};setDirty();render()};
-async function save(){const response=await fetch('/api/annotations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(state)});if(!response.ok){status(await response.text(),true);return}const result=await response.json();state.revision=result.revision;dirty=false;status(`SAVED: ${result.records} MAIN records · ${result.reviewed} reviewed. File: ${result.file}`)}$('save').onclick=save;document.onkeydown=e=>{if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)&&!(e.ctrlKey||e.metaKey))return;if(e.key==='ArrowLeft')move(-1);else if(e.key==='ArrowRight')move(1);else if(e.key.toLowerCase()==='f'){$('layer').value='false_colour';load()}else if(e.key.toLowerCase()==='p'){$('layer').value='pca';load()}else if(e.key.toLowerCase()==='i'){$('layer').value='stored_index';load()}else if(e.key.toLowerCase()==='b'){$('layer').value='support_outline';load()}else if(e.key.toLowerCase()==='z'){$('context').value=$('context').value==='close'?'medium':'close';render()}else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();save()}};window.onbeforeunload=e=>{if(dirty){e.preventDefault();e.returnValue=''}};
-async function init(){samples=await(await fetch('/api/samples')).json();manifest=await(await fetch('/api/manifest')).json();schema=await(await fetch('/api/schema')).json();state=await(await fetch('/api/annotations')).json();if(samples.length!==800||new Set(samples.map(s=>s.sampling_frame)).size!==1||samples[0].sampling_frame!=='main')throw new Error('Expected exact frozen 800-point MAIN frame');for(const name of schema.labels){const o=document.createElement('option');o.value=name;o.textContent=name.replaceAll('_',' ');$('label').appendChild(o)}for(const name of schema.confidence){const o=document.createElement('option');o.value=name;o.textContent=name;$('confidence').appendChild(o)}for(const value of ['',...new Set(samples.map(s=>s.cube_id))]){const o=document.createElement('option');o.value=value;o.textContent=value||'All cubes';$('cubeFilter').appendChild(o)}for(const value of ['',...new Set(samples.map(s=>s.cube_evaluation_role))]){const o=document.createElement('option');o.value=value;o.textContent=value?value.replaceAll('_',' '):'All roles';$('roleFilter').appendChild(o)}visible=samples;load()}init().catch(e=>status(String(e),true));
+const $=id=>document.getElementById(id),overview=$('overview'),overviewCtx=overview.getContext('2d'),detail=$('detail'),detailCtx=detail.getContext('2d');let samples=[],visible=[],manifest={},schema={},state={},index=0,image=new Image(),dirty=false;function sample(){return visible[index]}function record(){return state.annotations[sample().sample_id]}function status(x,bad=dirty){$('status').textContent=x;$('status').className=bad?'dirty':''}function setDirty(){dirty=true;status('UNSAVED changes — use Save all.',true)}function imageCoordinates(s,m){const step=$('layer').value==='natural_rgb'?+m.natural_rgb_preview_step:+m.preview_step;return{step,cx:(+s.column+.5)/step,cy:(+s.row+.5)/step}}
+function filter(){const cube=$('cubeFilter').value,role=$('roleFilter').value,review=$('reviewFilter').value,current=sample()?.sample_id;visible=samples.filter(s=>(!cube||s.cube_id===cube)&&(!role||s.cube_evaluation_role===role)&&(!review||state.annotations[s.sample_id].requires_visual_rereview));let found=visible.findIndex(s=>s.sample_id===current);index=found>=0?found:0;if(!visible.length){status('No MAIN samples match this filter.',true);return}load()}
+function drawOverview(s,m,cx,cy,step){const maxW=760,maxH=720,scale=Math.min(maxW/image.naturalWidth,maxH/image.naturalHeight,1);overview.width=Math.max(1,Math.round(image.naturalWidth*scale));overview.height=Math.max(1,Math.round(image.naturalHeight*scale));overviewCtx.imageSmoothingEnabled=true;overviewCtx.drawImage(image,0,0,overview.width,overview.height);const x=(cx-.5/step)*scale,y=(cy-.5/step)*scale,size=Math.max(2,scale/step);overviewCtx.strokeStyle='#ff2d55';overviewCtx.lineWidth=Math.max(1,Math.min(2,scale));overviewCtx.strokeRect(x,y,size,size)}
+function drawDetail(cx,cy){const zoom=+$('zoom').value,w=detail.width,h=detail.height,sourceW=w/zoom,sourceH=h/zoom;detailCtx.imageSmoothingEnabled=false;detailCtx.clearRect(0,0,w,h);detailCtx.drawImage(image,cx-sourceW/2,cy-sourceH/2,sourceW,sourceH,0,0,w,h);if($('grid').checked&&zoom>=8){detailCtx.strokeStyle='rgba(255,255,255,.28)';detailCtx.lineWidth=1;detailCtx.beginPath();const ox=w/2-(Math.floor(sourceW/2)*zoom),oy=h/2-(Math.floor(sourceH/2)*zoom);for(let x=ox;x<=w;x+=zoom){detailCtx.moveTo(Math.round(x)+.5,0);detailCtx.lineTo(Math.round(x)+.5,h)}for(let y=oy;y<=h;y+=zoom){detailCtx.moveTo(0,Math.round(y)+.5);detailCtx.lineTo(w,Math.round(y)+.5)}detailCtx.stroke()}detailCtx.strokeStyle='#ff2d55';detailCtx.lineWidth=2;detailCtx.strokeRect(w/2-zoom/2,h/2-zoom/2,zoom,zoom)}
+function render(){const s=sample(),r=record(),m=manifest[s.cube_id],coords=imageCoordinates(s,m);drawOverview(s,m,coords.cx,coords.cy,coords.step);drawDetail(coords.cx,coords.cy);const reviewed=Object.values(state.annotations).filter(x=>x.reviewed).length,rereview=Object.values(state.annotations).filter(x=>x.requires_visual_rereview).length;$('counter').textContent=`${index+1} / ${visible.length} filtered · ${reviewed}/800 reviewed · ${rereview} re-review`;$('label').value=r.selected_label;$('confidence').value=r.confidence;$('reviewer').value=r.reviewer_identifier;$('note').value=r.investigator_note;$('review').textContent=r.reviewed&&!r.requires_visual_rereview?'Reviewed ✓':'Mark reviewed';$('rereview').textContent=r.requires_visual_rereview?'VISUAL RE-REVIEW REQUIRED: this preserved label predates the frozen natural RGB display.':'';$('contradiction').textContent=r.role_contradiction?'ROLE CONTRADICTION RECORDED: investigator selected chickpea on a frozen absent-negative-control cube.':'';const wl=m.natural_rgb_wavelengths_nm;$('metadata').textContent=`sample ID: ${s.sample_id}\ncube ID: ${s.cube_id}\nfrozen cube role: ${s.cube_evaluation_role}\ncube notes: ${s.cube_investigator_notes||'(none)'}\nRGB wavelengths: ${wl.red} / ${wl.green} / ${wl.blue} nm\ndisplay version: ${r.annotation_display_version}\nrank stratum: ${s.scalar_index_rank_stratum}\nspatial block: ${s.spatial_group_id}\nframe: MAIN only`;status(`${s.sample_id} · ${r.reviewed?'REVIEWED':'not reviewed'}${r.requires_visual_rereview?' · RE-REVIEW REQUIRED':''} · ${r.selected_label||'unlabeled'}${dirty?' · UNSAVED':''}`,dirty)}
+function load(){const s=sample();if(!s)return;image.onload=render;image.onerror=()=>status('Prediction-free display layer failed to load.',true);image.src='/layers/'+s.cube_id+'/'+$('layer').value+'.png?v='+Date.now()}function move(d){index=Math.max(0,Math.min(visible.length-1,index+d));load()}function update(){const s=sample(),r=record();r.selected_label=$('label').value;r.confidence=$('confidence').value;r.reviewer_identifier=$('reviewer').value.trim();r.investigator_note=$('note').value;r.role_contradiction=r.selected_label==='chickpea'&&s.cube_evaluation_role==='chickpea_absent_negative_control';r.reviewed=false;r.review_timestamp='';setDirty();render()}
+$('prev').onclick=()=>move(-1);$('next').onclick=()=>move(1);$('cubeFilter').onchange=filter;$('roleFilter').onchange=filter;$('reviewFilter').onchange=filter;$('layer').onchange=load;$('zoom').onchange=render;$('grid').onchange=render;for(const id of ['label','confidence','reviewer','note'])$(id).addEventListener('change',update);$('review').onclick=()=>{const r=record();update();if(!r.selected_label||!r.confidence){status('Select a label and confidence before marking reviewed.',true);return}r.reviewed=true;r.review_timestamp=new Date().toISOString();r.requires_visual_rereview=false;setDirty();render()};$('clear').onclick=()=>{if(!confirm('Clear this MAIN annotation?'))return;const s=sample(),old=record();state.annotations[s.sample_id]={sample_id:s.sample_id,cube_id:s.cube_id,frozen_cube_role:s.cube_evaluation_role,selected_label:'',confidence:'',investigator_note:'',reviewed:false,review_timestamp:'',reviewer_identifier:'',role_contradiction:false,source_preview_checksums:JSON.parse(s.source_preview_checksums),sampling_frame_sha256:state.sampling_frame_sha256,annotation_display_version:state.annotation_display_version,annotation_display_contract_sha256:state.annotation_display_contract_sha256,natural_rgb_preview_sha256:old.natural_rgb_preview_sha256,requires_visual_rereview:false};setDirty();render()};
+async function save(){const response=await fetch('/api/annotations',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(state)});if(!response.ok){status(await response.text(),true);return}const result=await response.json();state.revision=result.revision;dirty=false;status(`SAVED: ${result.records} MAIN records · ${result.reviewed} reviewed. File: ${result.file}`)}$('save').onclick=save;function setLayer(name){$('layer').value=name;load()}function setZoom(value){$('zoom').value=String(value);render()}document.onkeydown=e=>{if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)&&!(e.ctrlKey||e.metaKey))return;if(e.key==='ArrowLeft')move(-1);else if(e.key==='ArrowRight')move(1);else if(e.key.toLowerCase()==='n')setLayer('natural_rgb');else if(e.key.toLowerCase()==='f')setLayer('false_colour');else if(e.key.toLowerCase()==='p')setLayer('pca');else if(e.key.toLowerCase()==='i')setLayer('stored_index');else if(e.key.toLowerCase()==='b')setLayer('support_outline');else if(['2','4','8'].includes(e.key))setZoom(e.key);else if(e.key.toLowerCase()==='x')setZoom(16);else if(e.key.toLowerCase()==='g'){$('grid').checked=!$('grid').checked;render()}else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();save()}};window.onbeforeunload=e=>{if(dirty){e.preventDefault();e.returnValue=''}};
+async function init(){samples=await(await fetch('/api/samples')).json();manifest=await(await fetch('/api/manifest')).json();schema=await(await fetch('/api/schema')).json();state=await(await fetch('/api/annotations')).json();if(samples.length!==800||new Set(samples.map(s=>s.sampling_frame)).size!==1||samples[0].sampling_frame!=='main'||schema.reserve_exposed)throw new Error('Expected exact frozen 800-point MAIN frame with reserve locked');if(schema.default_layer!=='natural_rgb'||schema.display_version!==state.annotation_display_version)throw new Error('Natural RGB display provenance mismatch');for(const name of schema.labels){const o=document.createElement('option');o.value=name;o.textContent=name.replaceAll('_',' ');$('label').appendChild(o)}for(const name of schema.confidence){const o=document.createElement('option');o.value=name;o.textContent=name;$('confidence').appendChild(o)}for(const value of ['',...new Set(samples.map(s=>s.cube_id))]){const o=document.createElement('option');o.value=value;o.textContent=value||'All cubes';$('cubeFilter').appendChild(o)}for(const value of ['',...new Set(samples.map(s=>s.cube_evaluation_role))]){const o=document.createElement('option');o.value=value;o.textContent=value?value.replaceAll('_',' '):'All roles';$('roleFilter').appendChild(o)}visible=samples;load()}init().catch(e=>status(String(e),true));
 </script></body></html>'''
 
 
@@ -206,7 +296,7 @@ def handler_factory(store: PointAnnotationStore):
             if clean == "/api/samples": return self.send_bytes(store.frame.to_json(orient="records").encode(), "application/json")
             if clean == "/api/manifest": return self.send_bytes(json.dumps(store.public_manifest()).encode(), "application/json")
             if clean == "/api/annotations": return self.send_bytes(json.dumps(store.load()).encode(), "application/json")
-            if clean == "/api/schema": return self.send_bytes(json.dumps({"labels": POINT_LABELS, "confidence": CONFIDENCE_VALUES, "frame": "main", "reserve_exposed": False}).encode(), "application/json")
+            if clean == "/api/schema": return self.send_bytes(json.dumps({"labels": POINT_LABELS, "confidence": CONFIDENCE_VALUES, "frame": "main", "reserve_exposed": False, "default_layer": "natural_rgb", "display_version": store.display_version}).encode(), "application/json")
             if clean.startswith("/layers/"):
                 parts = clean.strip("/").split("/")
                 if len(parts) == 3 and parts[2].endswith(".png"):
@@ -230,9 +320,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(); parser.add_argument("--paths", required=True, type=Path); parser.add_argument("--config", default=Path("configs/field2_blind_evaluation.yaml"), type=Path); parser.add_argument("--port", type=int); parser.add_argument("--no-browser", action="store_true"); args = parser.parse_args()
     paths, config = yaml.safe_load(args.paths.read_text()), yaml.safe_load(args.config.read_text()); project = Path(paths["project_root"]).resolve()
     released = require_main_sampling_frame(project, config)
-    store = PointAnnotationStore(project, released["main"], released["main_frame_sha256"], project / config["review"]["package_manifest"], project / config["point_annotation"]["output_root"])
+    display_contract_path = project / config["annotation_display"]["display_contract"]
+    display_result = validate_annotation_display_contract(project, config, display_contract_path)
+    store = PointAnnotationStore(
+        project, released["main"], released["main_frame_sha256"],
+        project / config["review"]["package_manifest"], display_result["manifest"],
+        config["annotation_display"]["version"], sha256(display_contract_path),
+        project / config["point_annotation"]["output_root"],
+    )
+    current, rereview_count = store.migrate_display_version(store.load())
     port = args.port or int(config["point_annotation"]["port"]); server = ThreadingHTTPServer(("127.0.0.1", port), handler_factory(store)); url = f"http://127.0.0.1:{port}"
-    print(f"Field 2 prediction-free MAIN point annotator: {url}", flush=True); print("Reserve frame: locked and not served", flush=True); print(f"Resume file: {store.json_path}", flush=True)
+    reviewed_count = sum(record["reviewed"] for record in current["annotations"].values())
+    print(f"Field 2 prediction-free MAIN point annotator: {url}", flush=True); print("Default layer: full-resolution natural RGB", flush=True); print("Reserve frame: locked and not served", flush=True); print(f"Reviewed records: {reviewed_count}; requiring RGB visual re-review: {rereview_count}", flush=True); print(f"Resume file: {store.json_path}", flush=True)
     if not args.no_browser: threading.Timer(.5, lambda: webbrowser.open(url)).start()
     try: server.serve_forever()
     except KeyboardInterrupt: print("\nPoint annotator stopped. Saved MAIN annotations remain on disk.", flush=True)

@@ -173,6 +173,19 @@ point_annotation:
   output_root: metadata/local/annotations/field2_blind_points
   port: 8773
 
+annotation_display:
+  version: field2_annotation_display_natural_rgb_v1
+  default_layer: natural_rgb
+  rgb_target_wavelengths_nm:
+    red: 670.0
+    green: 550.0
+    blue: 480.0
+  maximum_wavelength_difference_nm: 15.0
+  stretch_percentiles: [2.0, 98.0]
+  preview_root: metadata/local/reports/field2_annotation_display/natural_rgb
+  preview_manifest: metadata/local/reports/field2_annotation_display/field2_natural_rgb_manifest.csv
+  display_contract: metadata/local/contracts/field2_annotation_display_addendum.yaml
+
 safety:
   gdal_pam_enabled: "NO"
   localhost_only: true

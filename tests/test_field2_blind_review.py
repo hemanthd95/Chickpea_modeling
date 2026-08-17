@@ -23,15 +23,18 @@ from chickpea_ssl.field2_blind_review import (
     frozen_role_table_bytes,
     geographic_ground_cell_ids,
     minimum_separation_thin,
+    natural_rgb_png_bytes,
     require_frozen_role_contract,
     balanced_stratum_quotas,
     review_totals,
     role_summary_csv_bytes,
     scalar_index_rank_strata,
+    select_natural_rgb_bands,
     spatial_group_ids,
     stratified_deterministic_sample,
     select_main_reserve_frames,
     reject_prediction_provenance,
+    render_natural_rgb_uint8,
     validate_frozen_role_contract,
     validate_frozen_sampling_contract,
     validate_review_record,
@@ -544,14 +547,76 @@ def make_main_annotation_frame(manifest_path: Path) -> pd.DataFrame:
                 "chickpea_absent_negative_control" if cube_id == "field2_cube02" else "primary_three_class"
             ),
             "source_preview_checksums": manifest.loc[cube_id, "preview_sha256_json"],
+            "row": number % 6, "column": number % 8,
         })
     return pd.DataFrame(rows)
+
+
+def make_natural_rgb_manifest(tmp_path: Path, cube_ids=("field2_cube02", "field2_cube03")) -> pd.DataFrame:
+    selected = {
+        "red": {"target_wavelength_nm": 670.0, "selected_wavelength_nm": 671.0,
+                "python_band_index_0_based": 2, "envi_band_number_1_based": 3,
+                "absolute_difference_nm": 1.0},
+        "green": {"target_wavelength_nm": 550.0, "selected_wavelength_nm": 551.0,
+                  "python_band_index_0_based": 1, "envi_band_number_1_based": 2,
+                  "absolute_difference_nm": 1.0},
+        "blue": {"target_wavelength_nm": 480.0, "selected_wavelength_nm": 481.0,
+                 "python_band_index_0_based": 0, "envi_band_number_1_based": 1,
+                 "absolute_difference_nm": 1.0},
+    }
+    rows = []
+    for cube_id in cube_ids:
+        path = tmp_path / f"{cube_id}_natural_rgb.png"
+        atomic_write_bytes(path, natural_rgb_png_bytes(np.zeros((6, 8, 3), dtype=np.uint8)))
+        rows.append({
+            "cube_id": cube_id, "width": 8, "height": 6, "preview_step": 1,
+            "natural_rgb_path": path.name, "natural_rgb_sha256": sha256(path),
+            "selected_bands_json": json.dumps(selected, sort_keys=True),
+        })
+    return pd.DataFrame(rows)
+
+
+def make_point_store(tmp_path: Path, frame: pd.DataFrame, manifest_path: Path) -> PointAnnotationStore:
+    return PointAnnotationStore(
+        tmp_path, frame, "b" * 64, manifest_path, make_natural_rgb_manifest(tmp_path),
+        "field2_annotation_display_natural_rgb_v1", "c" * 64, tmp_path / "points",
+    )
+
+
+def test_natural_rgb_band_selection_stretch_mask_and_png_are_deterministic():
+    selected = select_natural_rgb_bands(
+        [479.0, 552.0, 668.0, 801.0],
+        {"red": 670.0, "green": 550.0, "blue": 480.0}, 5.0,
+    )
+    assert [selected[name]["python_band_index_0_based"] for name in ("red", "green", "blue")] == [2, 1, 0]
+    reflectance = np.arange(4 * 5 * 4, dtype=np.float32).reshape(4, 5, 4)
+    support = np.ones((4, 5), dtype=bool)
+    support[0, :] = False
+    rgb, stretch = render_natural_rgb_uint8(reflectance, support, selected, (2.0, 98.0))
+    assert rgb.dtype == np.uint8 and rgb.shape == (4, 5, 3)
+    assert np.all(rgb[~support] == 0)
+    assert all(stretch[channel]["low_percentile"] == 2.0 for channel in stretch)
+    first = natural_rgb_png_bytes(rgb)
+    assert first == natural_rgb_png_bytes(rgb)
+    assert hashlib.sha256(first).hexdigest() == hashlib.sha256(natural_rgb_png_bytes(rgb)).hexdigest()
+
+
+def test_natural_rgb_band_selection_rejects_out_of_tolerance():
+    try:
+        select_natural_rgb_bands(
+            [400.0, 500.0, 600.0],
+            {"red": 670.0, "green": 550.0, "blue": 480.0}, 10.0,
+        )
+    except ValueError as error:
+        assert "within 10.0 nm" in str(error)
+    else:
+        raise AssertionError("Out-of-tolerance natural RGB band selection passed")
 
 
 def test_main_annotation_save_resume_no_default_and_role_contradiction(tmp_path):
     manifest_path = make_review_manifest(tmp_path)
     frame = make_main_annotation_frame(manifest_path)
-    store = PointAnnotationStore(tmp_path, frame, "b" * 64, manifest_path, tmp_path / "points")
+    store = make_point_store(tmp_path, frame, manifest_path)
     payload = store.load()
     assert len(payload["annotations"]) == 800
     assert not any(record["selected_label"] for record in payload["annotations"].values())
@@ -567,12 +632,44 @@ def test_main_annotation_save_resume_no_default_and_role_contradiction(tmp_path)
     assert store.audit_path.is_file() and store.overview_path.is_file()
 
 
+def test_display_version_migration_preserves_labels_and_flags_only_reviewed_records(tmp_path):
+    manifest_path = make_review_manifest(tmp_path)
+    store = make_point_store(tmp_path, make_main_annotation_frame(manifest_path), manifest_path)
+    payload = store.initial_payload()
+    payload["annotations"]["sample-0000"].update(
+        selected_label="soil", confidence="high", reviewed=True,
+        review_timestamp="2026-08-17T14:00:00+00:00",
+    )
+    payload.pop("annotation_display_version")
+    payload.pop("annotation_display_contract_sha256")
+    for record in payload["annotations"].values():
+        for key in ("annotation_display_version", "annotation_display_contract_sha256",
+                    "natural_rgb_preview_sha256", "requires_visual_rereview"):
+            record.pop(key)
+    migrated, count = store.migrate_display_version(payload)
+    assert count == 1
+    assert migrated["annotations"]["sample-0000"]["selected_label"] == "soil"
+    assert migrated["annotations"]["sample-0000"]["requires_visual_rereview"] is True
+    assert migrated["annotations"]["sample-0001"]["selected_label"] == ""
+    assert migrated["annotations"]["sample-0001"]["requires_visual_rereview"] is False
+    assert migrated["automatic_metadata"]["display_version_migration_changed_biological_labels"] is False
+
+
+def test_new_display_version_with_zero_reviews_requires_no_rereview(tmp_path):
+    manifest_path = make_review_manifest(tmp_path)
+    store = make_point_store(tmp_path, make_main_annotation_frame(manifest_path), manifest_path)
+    payload, count = store.migrate_display_version(store.initial_payload())
+    assert count == 0
+    assert not any(record["requires_visual_rereview"] for record in payload["annotations"].values())
+    assert not any(record["selected_label"] for record in payload["annotations"].values())
+
+
 def test_point_annotator_rejects_any_reserve_exposure(tmp_path):
     manifest_path = make_review_manifest(tmp_path)
     frame = make_main_annotation_frame(manifest_path)
     frame.loc[0, "sampling_frame"] = "reserve"
     try:
-        PointAnnotationStore(tmp_path, frame, "b" * 64, manifest_path, tmp_path / "points")
+        make_point_store(tmp_path, frame, manifest_path)
     except ValueError as error:
         assert "main frame" in str(error)
     else:
@@ -589,6 +686,8 @@ def test_review_entrypoints_do_not_import_model_frameworks():
         Path("scripts/build_field2_blind_annotation_sampling_frame.py"),
         Path("scripts/validate_field2_blind_sampling_contract.py"),
         Path("scripts/run_field2_point_annotator.py"),
+        Path("scripts/prepare_field2_annotation_rgb.py"),
+        Path("scripts/validate_field2_annotation_display.py"),
     ]
     for path in paths:
         tree = ast.parse(path.read_text(), filename=str(path))
