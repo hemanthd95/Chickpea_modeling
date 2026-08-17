@@ -13,17 +13,23 @@ from chickpea_ssl.field2_blind_review import (
     PRIMARY_ROLES,
     REVIEW_FLAGS,
     CubeRoleReviewStore,
+    atomic_write_bytes,
     atomic_write_json,
     atomic_write_yaml,
     deduplicate_geographic_views,
     default_review_payload,
+    frozen_role_table_bytes,
     geographic_ground_cell_ids,
     require_frozen_role_contract,
+    review_totals,
+    role_summary_csv_bytes,
     scalar_index_rank_strata,
     spatial_group_ids,
     stratified_deterministic_sample,
     reject_prediction_provenance,
+    validate_frozen_role_contract,
     validate_review_record,
+    validate_saved_review_products,
     verify_preview_hashes,
 )
 from chickpea_ssl.field2_readiness import sha256
@@ -36,6 +42,11 @@ def test_configuration_freezes_exact_40_cube_inventory():
     assert config["expected_cube_ids"] == [f"field2_cube{value:02d}" for value in expected_numbers]
     assert len(config["expected_cube_ids"]) == 40
     assert config["valid_support_manifest_sha256"] == "1f48ffe67d7ad2cbf95cca5c2e6e98d15245843435c519bbb8a67841c2bbf3e3"
+    assert config["freeze"]["expected_role_totals"] == {
+        "primary_three_class": 20, "challenge_only": 8,
+        "chickpea_absent_negative_control": 7, "sensitivity_only": 5,
+        "exclude_with_reason": 0, "unreviewed": 0,
+    }
 
 
 def test_frozen_manifest_checksum_detects_changes(tmp_path):
@@ -125,6 +136,109 @@ def test_atomic_save_resume_and_no_automatic_biological_roles(tmp_path):
         assert "revision conflict" in str(error)
     else:
         raise AssertionError("Stale review payload overwrote saved work")
+
+
+def completed_review_store(tmp_path: Path) -> tuple[CubeRoleReviewStore, dict]:
+    manifest_path = make_review_manifest(tmp_path)
+    store = CubeRoleReviewStore(tmp_path, manifest_path, tmp_path / "annotations")
+    payload = store.load()
+    first = payload["reviews"]["field2_cube02"]
+    first.update(primary_role="primary_three_class", confidence="high", reviewed=True,
+                 review_timestamp="2026-08-17T12:00:00+00:00")
+    first["flags"].update(chickpea_visible=True, ordinary_weed_visible=True, soil_visible=True)
+    second = payload["reviews"]["field2_cube03"]
+    second.update(primary_role="chickpea_absent_negative_control", confidence="low", reviewed=True,
+                  review_timestamp="2026-08-17T12:01:00+00:00")
+    second["flags"].update(chickpea_absent_confirmed=True, ordinary_weed_visible=True, soil_visible=True)
+    store.save(payload)
+    return store, store.load()
+
+
+def test_saved_review_products_require_exact_json_csv_audit_agreement(tmp_path):
+    store, payload = completed_review_store(tmp_path)
+    totals = validate_saved_review_products(
+        payload, store.csv_path, store.audit_path, store.expected_cube_ids,
+    )
+    assert totals["reviewed"] == 2
+    assert totals["primary_roles"]["primary_three_class"] == 1
+    store.csv_path.write_text(store.csv_path.read_text().replace("primary_three_class", "challenge_only"))
+    try:
+        validate_saved_review_products(payload, store.csv_path, store.audit_path, store.expected_cube_ids)
+    except ValueError as error:
+        assert "CSV and JSON disagree" in str(error)
+    else:
+        raise AssertionError("Mutated review CSV passed JSON agreement validation")
+
+
+def test_frozen_role_contract_detects_later_input_mutation(tmp_path):
+    store, payload = completed_review_store(tmp_path)
+    totals = review_totals(payload)
+    support_manifest = tmp_path / "support.csv"
+    support_manifest.write_text("cube_id\nfield2_cube02\nfield2_cube03\n")
+    role_table = tmp_path / "frozen" / "roles.csv"
+    summary = tmp_path / "frozen" / "summary.csv"
+    overview = tmp_path / "frozen" / "overview.png"
+    atomic_write_bytes(role_table, frozen_role_table_bytes(payload))
+    atomic_write_bytes(summary, role_summary_csv_bytes(totals))
+    atomic_write_bytes(overview, store.overview_path.read_bytes())
+    inputs = {
+        "review_json": store.json_path, "review_csv": store.csv_path,
+        "review_audit": store.audit_path, "review_overview": store.overview_path,
+        "review_package_manifest": store.manifest_path,
+    }
+    outputs = {"role_table": role_table, "role_summary": summary, "frozen_overview": overview}
+    contract = {
+        "version": "field2_cube_role_contract_v1", "status": "field2_cube_roles_frozen",
+        "freeze_timestamp_utc": "2026-08-17T13:00:00+00:00", "freeze_git_commit": "a" * 40,
+        "review_schema_version": "field2_cube_role_reviews_v1", "review_revision": payload["revision"],
+        "cube_roles": [payload["reviews"][cube_id] for cube_id in store.expected_cube_ids],
+        "role_totals": totals["primary_roles"], "biological_flag_totals": totals["biological_flags"],
+        "frozen_input_products": {
+            name: {"path": str(path.relative_to(tmp_path)), "sha256": sha256(path)}
+            for name, path in inputs.items()
+        },
+        "frozen_output_products": {
+            name: {"path": str(path.relative_to(tmp_path)), "sha256": sha256(path)}
+            for name, path in outputs.items()
+        },
+        "field2_source_manifest_sha256": "source-hash",
+        "field2_valid_support_manifest_sha256": sha256(support_manifest),
+        "provenance": {
+            "prediction_free_review": True, "supervised_checkpoint_loaded": False,
+            "biological_roles_assigned_automatically": False,
+        },
+    }
+    contract_path = tmp_path / "contract.yaml"
+    atomic_write_yaml(contract_path, contract)
+    config = {
+        "expected_cube_ids": store.expected_cube_ids,
+        "source_manifest_sha256": "source-hash",
+        "review": {"package_manifest": str(store.manifest_path.relative_to(tmp_path))},
+        "inputs": {"valid_support_manifest": str(support_manifest.relative_to(tmp_path))},
+        "freeze": {
+            "expected_role_totals": totals["primary_roles"],
+            "expected_flag_totals": totals["biological_flags"],
+        },
+    }
+    assert validate_frozen_role_contract(tmp_path, config, contract_path)["totals"] == totals
+    source_review_text = store.json_path.read_text()
+    store.json_path.write_text(source_review_text.replace('"revision": 1', '"revision": 2'))
+    try:
+        validate_frozen_role_contract(tmp_path, config, contract_path)
+    except ValueError as error:
+        assert "SHA-256 changed" in str(error)
+    else:
+        raise AssertionError("Mutated frozen review JSON passed contract validation")
+    store.json_path.write_text(source_review_text)
+    mutated_contract = yaml.safe_load(contract_path.read_text())
+    mutated_contract["cube_roles"][0]["investigator_notes"] = "later mutation"
+    atomic_write_yaml(contract_path, mutated_contract)
+    try:
+        validate_frozen_role_contract(tmp_path, config, contract_path)
+    except ValueError as error:
+        assert "source reviews differ" in str(error)
+    else:
+        raise AssertionError("Mutated frozen role contract passed cross-product validation")
 
 
 def test_preview_checksum_verification_and_save_rejection(tmp_path):
@@ -247,6 +361,7 @@ def test_review_entrypoints_do_not_import_model_frameworks():
         Path("scripts/prepare_field2_cube_role_review.py"),
         Path("scripts/run_field2_cube_role_reviewer.py"),
         Path("scripts/freeze_field2_cube_role_contract.py"),
+        Path("scripts/validate_field2_cube_role_contract.py"),
         Path("scripts/build_field2_blind_annotation_sampling_frame.py"),
         Path("scripts/run_field2_point_annotator.py"),
     ]

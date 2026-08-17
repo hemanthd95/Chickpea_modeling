@@ -262,6 +262,111 @@ def _audit_csv_bytes(payload: dict, issues: dict[str, list[str]], hash_matches: 
     return buffer.getvalue().encode()
 
 
+def csv_boolean(value: object) -> bool:
+    normalized = str(value).strip().lower()
+    if normalized in {"true", "1", "yes"}:
+        return True
+    if normalized in {"false", "0", "no", ""}:
+        return False
+    raise ValueError(f"Unrecognized CSV boolean value: {value!r}")
+
+
+def review_totals(payload: dict) -> dict:
+    records = list(payload["reviews"].values())
+    return {
+        "primary_roles": {
+            role: sum(record["primary_role"] == role for record in records)
+            for role in PRIMARY_ROLES
+        },
+        "biological_flags": {
+            flag: sum(record["flags"][flag] is True for record in records)
+            for flag in REVIEW_FLAGS
+        },
+        "confidence": {
+            confidence: sum(record["confidence"] == confidence for record in records)
+            for confidence in CONFIDENCE_VALUES
+        },
+        "reviewed": sum(record["reviewed"] is True for record in records),
+    }
+
+
+def validate_saved_review_products(
+    payload: dict,
+    csv_path: Path,
+    audit_path: Path,
+    expected_cube_ids: Iterable[str],
+) -> dict:
+    """Require JSON, CSV, and audit products to describe one identical review."""
+    expected = list(expected_cube_ids)
+    logical = validate_review_payload(payload, expected)
+    invalid = {cube_id: values for cube_id, values in logical.items() if values}
+    if invalid:
+        raise ValueError(f"Logical review validation failed: {invalid}")
+
+    frame = pd.read_csv(csv_path, keep_default_na=False)
+    if len(frame) != len(expected) or frame.cube_id.nunique() != len(expected):
+        raise ValueError("Review CSV has duplicate or missing cube IDs")
+    if frame.cube_id.astype(str).tolist() != expected:
+        raise ValueError("Review CSV cube inventory or order differs from the frozen inventory")
+    scalar_fields = (
+        "primary_role", "investigator_notes", "exclusion_reason", "confidence",
+        "review_timestamp", "reviewer_identifier",
+    )
+    mismatches: list[str] = []
+    for row in frame.itertuples(index=False):
+        cube_id = str(row.cube_id)
+        record = payload["reviews"][cube_id]
+        for field in scalar_fields:
+            if str(getattr(row, field)) != record[field]:
+                mismatches.append(f"{cube_id}:{field}")
+        if csv_boolean(row.reviewed) != record["reviewed"]:
+            mismatches.append(f"{cube_id}:reviewed")
+        for flag in REVIEW_FLAGS:
+            if csv_boolean(getattr(row, flag)) != record["flags"][flag]:
+                mismatches.append(f"{cube_id}:{flag}")
+        if json.loads(str(row.source_preview_checksums)) != record["source_preview_checksums"]:
+            mismatches.append(f"{cube_id}:source_preview_checksums")
+    if mismatches:
+        raise ValueError(f"Review CSV and JSON disagree: {mismatches}")
+
+    audit = pd.read_csv(audit_path, keep_default_na=False)
+    if len(audit) != len(expected) or audit.cube_id.nunique() != len(expected):
+        raise ValueError("Review audit has duplicate or missing cube IDs")
+    if audit.cube_id.astype(str).tolist() != expected:
+        raise ValueError("Review audit cube inventory or order differs from the frozen inventory")
+    audit_issues: list[str] = []
+    for row in audit.itertuples(index=False):
+        record = payload["reviews"][str(row.cube_id)]
+        if str(row.logical_validation) != "pass":
+            audit_issues.append(f"{row.cube_id}:logical_validation")
+        if not csv_boolean(row.preview_hashes_match):
+            audit_issues.append(f"{row.cube_id}:preview_hashes_match")
+        if str(row.issues).strip():
+            audit_issues.append(f"{row.cube_id}:issues={row.issues}")
+        if csv_boolean(row.reviewed) != record["reviewed"]:
+            audit_issues.append(f"{row.cube_id}:reviewed")
+        if str(row.primary_role) != record["primary_role"]:
+            audit_issues.append(f"{row.cube_id}:primary_role")
+    if audit_issues:
+        raise ValueError(f"Unresolved review audit issues: {audit_issues}")
+    return review_totals(payload)
+
+
+def frozen_role_table_bytes(payload: dict) -> bytes:
+    return _review_csv_bytes(payload)
+
+
+def role_summary_csv_bytes(totals: dict) -> bytes:
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=["summary_type", "name", "count"])
+    writer.writeheader()
+    for section in ("primary_roles", "biological_flags", "confidence"):
+        for name, count in totals[section].items():
+            writer.writerow({"summary_type": section, "name": name, "count": count})
+    writer.writerow({"summary_type": "review_status", "name": "reviewed", "count": totals["reviewed"]})
+    return buffer.getvalue().encode()
+
+
 class CubeRoleReviewStore:
     """Resumable local store with validation, optimistic revision, and atomic exports."""
 
@@ -306,7 +411,9 @@ class CubeRoleReviewStore:
             return False
         return all(sha256(self.layer_path(cube_id, layer)) == expected[layer] for layer in PREVIEW_LAYERS)
 
-    def _write_overview(self, payload: dict) -> None:
+    def write_overview(self, payload: dict, target: Path | None = None) -> None:
+        target = (target or self.overview_path).resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
         colors = {
             "primary_three_class": "#2ca25f", "chickpea_absent_negative_control": "#3182bd",
             "challenge_only": "#e6550d", "sensitivity_only": "#756bb1",
@@ -325,13 +432,13 @@ class CubeRoleReviewStore:
             axis.set_title(f"{cube_id}\n{role} · {status} · flags {active_flags}", fontsize=7)
             axis.set_xticks([]); axis.set_yticks([])
         fig.suptitle("Field 2 investigator cube-role review (prediction-free)")
-        descriptor, name = tempfile.mkstemp(prefix=f".{self.overview_path.name}.", suffix=".png", dir=self.output_root)
+        descriptor, name = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".png", dir=target.parent)
         os.close(descriptor)
         temporary = Path(name)
         try:
             fig.savefig(temporary, dpi=160)
             plt.close(fig)
-            temporary.replace(self.overview_path)
+            temporary.replace(target)
         except Exception:
             plt.close(fig); temporary.unlink(missing_ok=True); raise
 
@@ -364,7 +471,7 @@ class CubeRoleReviewStore:
             atomic_write_json(self.json_path, saved)
             atomic_write_bytes(self.csv_path, _review_csv_bytes(saved))
             atomic_write_bytes(self.audit_path, _audit_csv_bytes(saved, issues, hash_matches))
-            self._write_overview(saved)
+            self.write_overview(saved)
             reviewed_count = sum(bool(record["reviewed"]) for record in saved["reviews"].values())
             return len(saved["reviews"]), reviewed_count
 
@@ -494,3 +601,119 @@ def require_frozen_role_contract(path: Path) -> dict:
     if contract.get("all_cubes_reviewed") is not True:
         raise RuntimeError("Cube-role contract does not freeze all reviewed cubes")
     return contract
+
+
+def _verified_contract_file(project: Path, reference: dict, label: str) -> Path:
+    relative = Path(str(reference.get("path", "")))
+    if not str(relative) or relative.is_absolute():
+        raise ValueError(f"{label} must use a project-relative path")
+    path = (project / relative).resolve()
+    try:
+        path.relative_to(project.resolve())
+    except ValueError as error:
+        raise ValueError(f"{label} escapes the project directory") from error
+    if not path.is_file() or sha256(path) != str(reference.get("sha256", "")):
+        raise ValueError(f"{label} is missing or its SHA-256 changed")
+    return path
+
+
+def validate_frozen_role_contract(project: Path, config: dict, contract_path: Path) -> dict:
+    """Validate a frozen role contract and every hashed input/output dependency."""
+    contract = yaml.safe_load(contract_path.read_text())
+    if contract.get("version") != "field2_cube_role_contract_v1":
+        raise ValueError("Unknown frozen role-contract version")
+    if contract.get("status") != "field2_cube_roles_frozen":
+        raise ValueError("Field 2 cube roles are not frozen")
+    expected = list(config["expected_cube_ids"])
+    rows = contract.get("cube_roles")
+    if not isinstance(rows, list) or [row.get("cube_id") for row in rows] != expected:
+        raise ValueError("Frozen role contract does not contain the exact ordered 40-cube inventory")
+    if len({row["cube_id"] for row in rows}) != len(expected):
+        raise ValueError("Frozen role contract contains duplicate cube IDs")
+    payload = {
+        "version": contract.get("review_schema_version"),
+        "reviews": {row["cube_id"]: row for row in rows},
+    }
+    issues = validate_review_payload(payload, expected)
+    invalid = {cube_id: values for cube_id, values in issues.items() if values}
+    if invalid:
+        raise ValueError(f"Frozen role contract has invalid reviews: {invalid}")
+    totals = review_totals(payload)
+    if totals["reviewed"] != len(expected):
+        raise ValueError("Frozen role contract does not mark all 40 cubes reviewed")
+    if totals["primary_roles"].get("unreviewed"):
+        raise ValueError("Frozen role contract contains an unreviewed primary role")
+    if totals["primary_roles"] != contract.get("role_totals"):
+        raise ValueError("Frozen role totals differ from the contract summary")
+    if totals["biological_flags"] != contract.get("biological_flag_totals"):
+        raise ValueError("Frozen biological-flag totals differ from the contract summary")
+    for name, expected_count in config["freeze"]["expected_role_totals"].items():
+        if totals["primary_roles"].get(name) != int(expected_count):
+            raise ValueError(f"Unexpected frozen role total: {name}")
+    for name, expected_count in config["freeze"]["expected_flag_totals"].items():
+        if totals["biological_flags"].get(name) != int(expected_count):
+            raise ValueError(f"Unexpected frozen biological-flag total: {name}")
+    if not str(contract.get("freeze_timestamp_utc", "")).strip():
+        raise ValueError("Frozen role contract has no freeze timestamp")
+    commit = str(contract.get("freeze_git_commit", ""))
+    if len(commit) != 40 or any(character not in "0123456789abcdef" for character in commit):
+        raise ValueError("Frozen role contract has no exact Git commit")
+    if contract.get("review_schema_version") != "field2_cube_role_reviews_v1":
+        raise ValueError("Frozen role contract has an unexpected review schema")
+    provenance = contract.get("provenance", {})
+    reject_prediction_provenance(provenance)
+    if provenance.get("prediction_free_review") is not True:
+        raise ValueError("Frozen role contract does not declare prediction-free review")
+    if provenance.get("supervised_checkpoint_loaded") is not False:
+        raise ValueError("Frozen role contract does not declare that checkpoints were not loaded")
+    if provenance.get("biological_roles_assigned_automatically") is not False:
+        raise ValueError("Frozen role contract permits automatic biological roles")
+
+    inputs = contract.get("frozen_input_products", {})
+    verified_inputs = {}
+    for name in ("review_json", "review_csv", "review_audit", "review_overview", "review_package_manifest"):
+        verified_inputs[name] = _verified_contract_file(
+            project, inputs.get(name, {}), f"frozen input {name}",
+        )
+    outputs = contract.get("frozen_output_products", {})
+    verified_outputs = {}
+    for name in ("role_table", "role_summary", "frozen_overview"):
+        verified_outputs[name] = _verified_contract_file(
+            project, outputs.get(name, {}), f"frozen output {name}",
+        )
+    source_payload = json.loads(verified_inputs["review_json"].read_text())
+    source_totals = validate_saved_review_products(
+        source_payload, verified_inputs["review_csv"], verified_inputs["review_audit"], expected,
+    )
+    if source_payload.get("version") != contract["review_schema_version"]:
+        raise ValueError("Frozen source review schema differs from the role contract")
+    if source_payload.get("revision") != contract.get("review_revision"):
+        raise ValueError("Frozen source review revision differs from the role contract")
+    if source_payload["reviews"] != payload["reviews"] or source_totals != totals:
+        raise ValueError("Frozen source reviews differ from the role contract")
+    table_totals = validate_saved_review_products(
+        payload, verified_outputs["role_table"], verified_inputs["review_audit"], expected,
+    )
+    if table_totals != totals:
+        raise ValueError("Frozen role table differs from the role contract")
+    summary = pd.read_csv(verified_outputs["role_summary"], keep_default_na=False)
+    expected_summary = pd.read_csv(io.BytesIO(role_summary_csv_bytes(totals)), keep_default_na=False)
+    if not summary.equals(expected_summary):
+        raise ValueError("Frozen role summary differs from the role contract")
+    if inputs["review_package_manifest"]["sha256"] != sha256(project / config["review"]["package_manifest"]):
+        raise ValueError("Review-package manifest differs from the configured package")
+    if contract.get("field2_source_manifest_sha256") != config["source_manifest_sha256"]:
+        raise ValueError("Field 2 source-manifest hash differs from the frozen configuration")
+    support_path = project / config["inputs"]["valid_support_manifest"]
+    if contract.get("field2_valid_support_manifest_sha256") != sha256(support_path):
+        raise ValueError("Field 2 valid-support manifest changed after role freeze")
+
+    manifest = pd.read_csv(project / config["review"]["package_manifest"]).fillna("")
+    preview_by_cube = {
+        str(row.cube_id): manifest_preview_hashes(row)
+        for row in manifest.itertuples(index=False)
+    }
+    for row in rows:
+        if row["source_preview_checksums"] != preview_by_cube.get(row["cube_id"]):
+            raise ValueError(f"Frozen preview-checksum reference changed: {row['cube_id']}")
+    return {"contract": contract, "totals": totals}

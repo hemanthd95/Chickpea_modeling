@@ -67,6 +67,25 @@ review:
   preview_percentiles: [2.0, 98.0]
   false_colour_wavelengths_nm: [800.0, 670.0, 550.0]
 
+freeze:
+  role_table: metadata/local/contracts/field2_cube_role_table.csv
+  summary_table: metadata/local/reports/field2_cube_role_freeze/field2_cube_role_summary.csv
+  frozen_overview: metadata/local/reports/field2_cube_role_freeze/field2_cube_role_frozen_overview.png
+  expected_role_totals:
+    primary_three_class: 20
+    challenge_only: 8
+    chickpea_absent_negative_control: 7
+    sensitivity_only: 5
+    exclude_with_reason: 0
+    unreviewed: 0
+  expected_flag_totals:
+    chickpea_visible: 20
+    chickpea_very_small_or_immature: 14
+    chickpea_absent_confirmed: 7
+    ordinary_weed_visible: 40
+    tall_grass_weed_visible: 34
+    soil_visible: 40
+
 role_schema:
   primary_roles:
     - primary_three_class

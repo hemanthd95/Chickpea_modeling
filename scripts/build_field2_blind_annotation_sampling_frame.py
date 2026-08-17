@@ -112,9 +112,9 @@ def main() -> None:
     if list(roles) != expected:
         raise RuntimeError("Frozen role contract does not contain the exact 40-cube inventory")
     manifest_path = project / config["inputs"]["valid_support_manifest"]
-    if sha256(manifest_path) != role_contract["valid_support_manifest_sha256"]:
+    if sha256(manifest_path) != role_contract["field2_valid_support_manifest_sha256"]:
         raise RuntimeError("Valid-support manifest differs from the frozen role contract")
-    if role_contract["source_manifest_sha256"] != config["source_manifest_sha256"]:
+    if role_contract["field2_source_manifest_sha256"] != config["source_manifest_sha256"]:
         raise RuntimeError("Field 2 source manifest differs from the frozen role contract")
 
     roots = tuple(Path(value) for value in paths["field2"]["readiness_roots"])
