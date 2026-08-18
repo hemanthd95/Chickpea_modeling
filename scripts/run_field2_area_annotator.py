@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import yaml
 
 from chickpea_ssl.field2_area_review import (
-    CONFIDENCE_VALUES, COVERAGE_MODES, ZONE_TYPES, Field2AreaAnnotationStore,
+    CONFIDENCE_VALUES, COVERAGE_MODES, ZONE_DEFINITIONS, ZONE_TYPES, Field2AreaAnnotationStore,
 )
 from chickpea_ssl.field2_readiness import sha256
 
@@ -46,7 +46,7 @@ button,select,input,textarea{font:inherit;color:inherit;background:#26313b;borde
 <label class="field"><span>Coverage mode</span><select id="coverage"><option value="">Choose coverage mode…</option></select></label>
 <div class="field"><span>Zone type</span><div id="zoneButtons" class="button-grid"></div></div>
 <div class="field"><span>Drawing and editing</span><div class="button-grid">
-<button id="draw">Draw polygon</button><button id="finish">Finish polygon</button><button id="edit">Edit vertices</button><button id="insert">Insert vertex</button><button id="deleteVertex">Delete vertex</button><button id="movePolygon">Move polygon</button><button id="pan">Pan</button><button id="deletePolygon" class="danger">Delete polygon</button><button id="undo">Undo</button><button id="redo">Redo</button><button id="clearSelected" class="danger">Clear selected</button>
+<button id="draw">Draw polygon</button><button id="finish">Finish polygon</button><button id="cancelDrawing" class="danger">Cancel current polygon</button><button id="edit">Edit vertices</button><button id="insert">Insert vertex</button><button id="deleteVertex">Delete vertex</button><button id="movePolygon">Move polygon</button><button id="pan">Pan</button><button id="deletePolygon" class="danger">Delete polygon</button><button id="undo">Undo</button><button id="redo">Redo</button><button id="clearSelected" class="danger">Clear selected</button>
 </div></div>
 <label class="field"><span>Polygon opacity</span><input id="opacity" type="range" min="0" max="0.7" step="0.05" value="0.25"></label>
 <div class="field"><span>Visible zone types</span><div id="zoneToggles" class="button-grid"></div></div>
@@ -54,8 +54,8 @@ button,select,input,textarea{font:inherit;color:inherit;background:#26313b;borde
 <label class="field"><span>Confidence</span><select id="confidence"><option value="">Choose confidence…</option></select></label>
 <label class="field"><span>Reviewer identifier (optional)</span><input id="reviewer"></label>
 <label class="field"><span>Investigator notes</span><textarea id="notes" rows="3"></textarea></label>
-<p id="audit" class="help"></p>
-<details class="help"><summary>Scientific zone definitions</summary><p><b>Research crop area:</b> actual experimental crop/plot area; soil and vegetation may both occur.</p><p><b>Alley:</b> investigator-confirmed plot or tractor alley; only soil and weeds occur by investigator rule.</p><p><b>Outside research field:</b> valid imagery outside the intended experiment; it may contain soil or varied vegetation.</p><p><b>Uncertain boundary:</b> geometry that cannot be placed confidently.</p><p>Zones are contextual domains and never automatic biological labels.</p></details>
+<p id="audit" class="help"></p><pre id="auditDetails" class="help warning"></pre>
+<details class="help"><summary>Scientific zone definitions</summary><p><b>Research crop area:</b> investigator-identified planted-row/research-plot domain; not a biological chickpea label.</p><p><b>Alley:</b> investigator-confirmed plot or tractor alley; only soil and weeds occur by investigator rule.</p><p><b>Outside research field:</b> valid imagery outside the intended experiment; it may contain soil or varied vegetation.</p><p><b>Uncertain boundary:</b> geometry that cannot be placed confidently.</p><p>Zones are contextual domains and never automatic biological labels.</p></details>
 </div><div class="side-bottom"><div class="row"><button id="review" class="primary">Mark cube reviewed</button><button id="save" class="primary">Save all</button></div><div class="help">Save is atomic and resumable. Geometry is not frozen here.</div></div></aside>
 </div><script src="/field2-area-annotator.js"></script></body></html>'''
 
@@ -84,6 +84,7 @@ def handler_factory(store: Field2AreaAnnotationStore):
             if clean == "/api/schema":
                 return self.send_bytes(json.dumps({
                     "coverage_modes": COVERAGE_MODES, "zone_types": ZONE_TYPES,
+                    "zone_definitions": ZONE_DEFINITIONS,
                     "confidence": CONFIDENCE_VALUES, "reserve_exposed": False,
                     "biological_labels_available": False, "default_layer": "natural_rgb",
                 }).encode(), "application/json")

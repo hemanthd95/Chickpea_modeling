@@ -38,6 +38,13 @@ ZONE_TYPES = (
     "uncertain_boundary",
 )
 
+ZONE_DEFINITIONS = {
+    "research_crop_area": "investigator-identified planted-row/research-plot domain; not a biological chickpea label.",
+    "alley": "investigator-confirmed plot or tractor alley; only soil and weeds occur by investigator rule.",
+    "outside_research_field": "valid imagery outside the intended experiment; it may contain soil or varied vegetation.",
+    "uncertain_boundary": "geometry that cannot be placed confidently.",
+}
+
 ZONE_CODES = {
     "unassigned_valid_support": 0,
     "research_crop_area": 1,
@@ -83,6 +90,15 @@ def normalize_vertices(vertices: list[dict | list | tuple]) -> list[tuple[float,
             raise ValueError("Polygon vertices must be finite")
         result.append((x, y))
     return result
+
+
+def distinct_vertex_count(vertices: list[dict | list | tuple], epsilon: float = 1e-9) -> int:
+    """Count distinct submitted points without changing or deduplicating the source list."""
+    distinct: list[tuple[float, float]] = []
+    for point in normalize_vertices(vertices):
+        if not any(abs(point[0] - seen[0]) <= epsilon and abs(point[1] - seen[1]) <= epsilon for seen in distinct):
+            distinct.append(point)
+    return len(distinct)
 
 
 def polygon_area(vertices: list[tuple[float, float]]) -> float:
@@ -172,6 +188,18 @@ def clip_polygon_to_bounds(
     return clip(points, lambda p: p[1] <= height, horizontal(height))
 
 
+def polygon_stage_counts(vertices, width: int, height: int) -> dict[str, int]:
+    """Report validation stages while leaving every submitted vertex untouched."""
+    submitted = normalize_vertices(vertices)
+    clipped = clip_polygon_to_bounds(submitted, width, height) if len(submitted) >= 3 else list(submitted)
+    return {
+        "displayed_vertex_count": len(submitted),
+        "submitted_vertex_count": len(submitted),
+        "distinct_pixel_vertex_count": distinct_vertex_count(submitted),
+        "clipped_vertex_count": len(clipped),
+    }
+
+
 def pixel_vertices_to_map(vertices, transform: Affine) -> list[dict[str, float]]:
     result = []
     for x, y in normalize_vertices(vertices):
@@ -190,7 +218,8 @@ def map_vertices_to_pixel(vertices, transform: Affine) -> list[dict[str, float]]
 
 
 def polygon_raster_mask(vertices, shape: tuple[int, int]) -> np.ndarray:
-    points = normalize_vertices(vertices)
+    height, width = shape
+    points = clip_polygon_to_bounds(vertices, width, height)
     if len(points) < 3 or polygon_area(points) <= 0:
         return np.zeros(shape, dtype=bool)
     geometry = {"type": "Polygon", "coordinates": [[*points, points[0]]]}
@@ -374,8 +403,11 @@ class Field2AreaAnnotationStore:
             transform = affine_from_json(record.get("source_transform", self.support[cube_id].transform))
             for polygon in record.get("polygons", []):
                 vertices = normalize_vertices(polygon.get("vertices_pixel", []))
-                polygon["vertices_pixel"] = [{"x": x, "y": y} for x, y in vertices]
-                polygon["vertices_geospatial"] = pixel_vertices_to_map(vertices, transform)
+                # Existing source vertices, ordering, and geospatial values are immutable.
+                # New or edited polygons deliberately omit map vertices so only those values
+                # are derived from the original submitted pixel coordinates.
+                if "vertices_geospatial" not in polygon:
+                    polygon["vertices_geospatial"] = pixel_vertices_to_map(vertices, transform)
         return result
 
     def validate(self, payload: dict) -> dict[str, list[str]]:
@@ -429,8 +461,10 @@ class Field2AreaAnnotationStore:
                 except (KeyError, TypeError, ValueError):
                     item_issues.append("invalid_polygon_vertices")
                     continue
-                if len(vertices) < 3 or polygon_area(vertices) <= 0:
-                    item_issues.append(f"polygon_too_small:{polygon_id}")
+                counts = polygon_stage_counts(vertices, width, height)
+                if counts["distinct_pixel_vertex_count"] < 3 or polygon_area(vertices) <= 0:
+                    detail = ",".join(f"{key}={value}" for key, value in counts.items())
+                    item_issues.append(f"polygon_too_small:{polygon_id}:stage=submitted_geometry_validation:{detail}")
                 if any(x < -extension or x > width + extension or y < -extension or y > height + extension for x, y in vertices):
                     item_issues.append(f"polygon_exceeds_allowed_raster_margin:{polygon_id}")
                 if record.get("reviewed") and polygon_self_intersects(vertices):
@@ -539,6 +573,15 @@ class Field2AreaAnnotationStore:
             current = self.load()
             if int(payload.get("revision", -1)) != int(current["revision"]):
                 raise ValueError("Area annotation revision conflict; reload before saving")
+            if payload == current:
+                reviewed = sum(item["reviewed"] for item in current["annotations"].values())
+                polygons = sum(len(item["polygons"]) for item in current["annotations"].values())
+                vertices = sum(
+                    len(polygon["vertices_pixel"])
+                    for item in current["annotations"].values()
+                    for polygon in item["polygons"]
+                )
+                return reviewed, polygons, vertices, current["revision"]
             normalized = self.normalize_payload(payload)
             issues = self.validate(normalized)
             invalid = {cube_id: value for cube_id, value in issues.items() if value}

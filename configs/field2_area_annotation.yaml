@@ -36,6 +36,11 @@ annotation:
     - alley
     - outside_research_field
     - uncertain_boundary
+  zone_definitions:
+    research_crop_area: "investigator-identified planted-row/research-plot domain; not a biological chickpea label."
+    alley: "investigator-confirmed plot or tractor alley; only soil and weeds occur by investigator rule."
+    outside_research_field: "valid imagery outside the intended experiment; it may contain soil or varied vegetation."
+    uncertain_boundary: "geometry that cannot be placed confidently."
 
 freeze:
   output_root: metadata/local/contracts/field2_area_zone_freeze

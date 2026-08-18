@@ -972,3 +972,19 @@ corrections.
 - All 108 tests and every frozen Field 1/Field 2 source, support, role, sampling,
   and RGB validator passed. Point labels/reviews remain zero; all sampling and
   point-annotation hashes are unchanged.
+
+
+### Field 2 area polygon finalization corrected without rewriting geometry
+
+- Backed up and hashed the revision-25 area package before diagnosis; all 225
+  polygons and original investigator vertices remain byte-identical.
+- Reproduced the cube12 crop failure in isolated Firefox: tool switching silently
+  cleared a valid draft, while double-click appended two terminal pointer events
+  without finalizing.
+- Preserved unfinished drafts across tool changes, locked draft zone identity,
+  unified Finish/Enter/double-click completion, added explicit cancel and detailed
+  validation-stage counts, and separated original from operational clipped geometry.
+- Generated a non-applying 54-row terminal-vertex reconciliation table with 53
+  review-only candidates and one manual-review/no-change record.
+- Presented exact overlap pairs without priority and retained mixed-mode review
+  gates for cubes 11, 16, and 17. Area geometry remains unfrozen.
