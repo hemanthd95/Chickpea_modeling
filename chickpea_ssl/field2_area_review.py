@@ -274,24 +274,8 @@ def incompatible_overlap_rows(polygons: list[dict], support: np.ndarray) -> list
 
 
 def compile_zone_mask(record: dict, support: np.ndarray) -> np.ndarray:
-    result = np.zeros(support.shape, dtype=np.uint8)
-    mode = record["coverage_mode"]
-    if mode == "entire_support_research_field":
-        result[support] = ZONE_CODES["research_crop_area"]
-    elif mode == "entire_support_outside_research_field":
-        result[support] = ZONE_CODES["outside_research_field"]
-    elif mode == "uncertain_requires_review":
-        result[support] = ZONE_CODES["uncertain_boundary"]
-    elif mode == "mixed_manual_boundaries":
-        for polygon in record["polygons"]:
-            mask = polygon_raster_mask(polygon["vertices_pixel"], support.shape) & support
-            result[mask] = ZONE_CODES[polygon["zone_type"]]
-        if record.get("treat_unassigned_valid_support_as_outside", False):
-            result[support & (result == 0)] = ZONE_CODES["outside_research_field"]
-    else:
-        raise ValueError(f"Unknown coverage mode: {mode}")
-    result[~support] = 0
-    return result
+    from chickpea_ssl.field2_area_operational import compile_operational_membership
+    return compile_operational_membership(record, support)["winning_membership"]
 
 
 def zone_name_from_code(code: int) -> str:
@@ -411,6 +395,7 @@ class Field2AreaAnnotationStore:
         return result
 
     def validate(self, payload: dict) -> dict[str, list[str]]:
+        from chickpea_ssl.field2_area_operational import effective_coverage_mode, operationalize_polygon
         if payload.get("version") != "field2_area_annotations_v1":
             raise ValueError("Unknown Field 2 area-annotation schema")
         if payload.get("cube_order") != self.cube_order:
@@ -443,12 +428,9 @@ class Field2AreaAnnotationStore:
             polygons = record.get("polygons", [])
             if not isinstance(polygons, list):
                 raise ValueError(f"Polygons must be a list: {cube_id}")
-            if mode and mode != "mixed_manual_boundaries" and polygons:
-                item_issues.append("polygons_require_mixed_manual_boundaries")
             seen_ids = set()
             width, height = int(self.support[cube_id].width), int(self.support[cube_id].height)
             transform = affine_from_json(expected["source_transform"])
-            extension = 0.1 * max(width, height)
             for polygon in polygons:
                 polygon_id = str(polygon.get("polygon_id", ""))
                 if not polygon_id or polygon_id in seen_ids:
@@ -462,13 +444,13 @@ class Field2AreaAnnotationStore:
                     item_issues.append("invalid_polygon_vertices")
                     continue
                 counts = polygon_stage_counts(vertices, width, height)
-                if counts["distinct_pixel_vertex_count"] < 3 or polygon_area(vertices) <= 0:
+                if counts["distinct_pixel_vertex_count"] < 3:
                     detail = ",".join(f"{key}={value}" for key, value in counts.items())
                     item_issues.append(f"polygon_too_small:{polygon_id}:stage=submitted_geometry_validation:{detail}")
-                if any(x < -extension or x > width + extension or y < -extension or y > height + extension for x, y in vertices):
-                    item_issues.append(f"polygon_exceeds_allowed_raster_margin:{polygon_id}")
-                if record.get("reviewed") and polygon_self_intersects(vertices):
-                    item_issues.append(f"self_intersection:{polygon_id}")
+                try:
+                    operationalize_polygon(polygon, (height, width))
+                except ValueError as error:
+                    item_issues.append(f"unusable_operational_geometry:{polygon_id}:{error}")
                 expected_geo = pixel_vertices_to_map(vertices, transform)
                 observed_geo = polygon.get("vertices_geospatial", [])
                 if len(observed_geo) != len(expected_geo) or any(
@@ -477,18 +459,15 @@ class Field2AreaAnnotationStore:
                     for axis in ("x", "y")
                 ):
                     item_issues.append(f"geospatial_vertices_mismatch:{polygon_id}")
-            if polygons and record.get("reviewed"):
-                overlaps = incompatible_overlap_rows(polygons, self.support_mask(cube_id))
-                if overlaps:
-                    item_issues.append("incompatible_zone_overlap")
             if record.get("reviewed"):
-                if not mode:
+                effective_mode = effective_coverage_mode(record)
+                if not effective_mode:
                     item_issues.append("reviewed_requires_coverage_mode")
                 if confidence not in CONFIDENCE_VALUES:
                     item_issues.append("reviewed_requires_confidence")
                 if not str(record.get("review_timestamp", "")).strip():
                     item_issues.append("reviewed_requires_timestamp")
-                if mode == "mixed_manual_boundaries" and not polygons:
+                if effective_mode == "mixed_manual_boundaries" and not polygons:
                     item_issues.append("mixed_review_requires_polygons")
             for key in ("investigator_notes", "review_timestamp", "reviewer_identifier"):
                 if not isinstance(record.get(key, ""), str):

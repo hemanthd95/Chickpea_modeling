@@ -42,13 +42,31 @@ annotation:
     outside_research_field: "valid imagery outside the intended experiment; it may contain soil or varied vegetation."
     uncertain_boundary: "geometry that cannot be placed confidently."
 
+operational_geometry:
+  output_root: metadata/local/annotations/field2_area_zones/operational_geometry
+  source_vertices_immutable: true
+  terminal_near_duplicate_distance_pixels: 12.0
+  terminal_repair_scope: operational_only
+  validity_repair: deterministic_raster_polygonize_all_components
+  pixel_domain_precedence_low_to_high:
+    - research_crop_area
+    - uncertain_boundary
+    - alley
+    - outside_research_field
+  precedence_rule: outside_research_field>alley>uncertain_boundary>research_crop_area
+  overlap_policy: warning_and_deterministic_precedence
+  blank_mode_with_polygons: mixed_manual_boundaries
+  biological_labels_assigned: false
+
 freeze:
   output_root: metadata/local/contracts/field2_area_zone_freeze
   contract: metadata/local/contracts/field2_area_zone_contract.yaml
   main_membership: field2_area_zone_membership_main.csv
   reserve_membership_locked: field2_area_zone_membership_reserve_locked.csv
   counts: field2_area_zone_counts.csv
+  precedence_summary: field2_area_precedence_summary.csv
   mask_root: masks
+  raw_membership_mask_root: raw_membership_masks
   expected_reviewed_cubes: 40
   reserve_coordinates_in_outputs: false
   overwrite_prohibited: true

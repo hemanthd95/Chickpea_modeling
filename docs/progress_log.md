@@ -988,3 +988,19 @@ corrections.
   review-only candidates and one manual-review/no-change record.
 - Presented exact overlap pairs without priority and retained mixed-mode review
   gates for cubes 11, 16, and 17. Area geometry remains unfrozen.
+
+
+### Investigator-approved Field 2 operational geometry policy
+
+- Preserved all 225 raw polygons and 1,602 original vertices while deriving
+  operational geometry separately.
+- Applied all 53 terminal-only proposals to operational geometry; used
+  deterministic raster polygonization for the remaining invalid polygon and
+  retained its three components with a 0.002054% operational area change.
+- Changed self-intersections, minor overlaps, near-terminal points, and raster-
+  edge extension to audit warnings, with deterministic pixel precedence:
+  outside field > alley > uncertain > research crop.
+- Added raw membership, winning membership, precedence, and effective-mode
+  provenance to the future freeze workflow without exposing reserve coordinates.
+- Made polygon-bearing blank coverage records operationally mixed while keeping
+  their raw annotation fields unchanged. Freeze remains unexecuted at 3/40 review.

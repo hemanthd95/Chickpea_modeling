@@ -18,6 +18,7 @@ import yaml
 from chickpea_ssl.field2_area_review import (
     CONFIDENCE_VALUES, COVERAGE_MODES, ZONE_DEFINITIONS, ZONE_TYPES, Field2AreaAnnotationStore,
 )
+from chickpea_ssl.field2_area_operational import PRECEDENCE_RULE, ZONE_PRECEDENCE
 from chickpea_ssl.field2_readiness import sha256
 
 
@@ -31,7 +32,7 @@ HTML = r'''<!doctype html>
 button,select,input,textarea{font:inherit;color:inherit;background:#26313b;border:1px solid #52606d;border-radius:5px;padding:6px}button{cursor:pointer}button:hover{background:#33414d}button.active,[aria-pressed=true]{outline:2px solid #67e8f9;outline-offset:1px}.primary{background:#18794e}.danger{background:#7f1d1d}
 .stage-wrap{min-height:0;overflow:auto;padding:10px;display:flex;align-items:center;justify-content:center;background:#020406}.stage{position:relative;max-width:100%;max-height:100%}canvas{display:block;width:min(100%,1100px);height:auto;max-height:calc(100vh - 76px);background:#000;border:1px solid #52606d;touch-action:none;cursor:crosshair;image-rendering:pixelated}
 .side{position:sticky;top:0;height:100vh;min-height:0;background:#151b21;border-left:1px solid #3f4b56;display:grid;grid-template-rows:auto minmax(0,1fr) auto;z-index:20}.side-top,.side-bottom{position:relative;z-index:3;background:#182028;padding:9px;border-bottom:1px solid #3f4b56}.side-bottom{border-top:1px solid #3f4b56;border-bottom:0}.side-scroll{overflow:auto;padding:10px}.row,.button-grid{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.button-grid button{flex:1 1 44%;min-width:135px}.field{display:block;margin:8px 0}.field>span{display:block;color:#b9c4ce;font-size:.8rem;margin-bottom:3px}.field textarea,.field input,.field select{width:100%}
-.zone-research_crop_area{border-color:#22c55e!important}.zone-alley{border-color:#f97316!important}.zone-outside_research_field{border-color:#3b82f6!important}.zone-uncertain_boundary{border-color:#a855f7!important}.help{font-size:.76rem;line-height:1.35;color:#b9c4ce}.warning{color:#ffd166}.ok{color:#86efac}#status{font-size:.82rem;margin-top:6px}.tool-status{font-weight:700;color:#67e8f9}
+.zone-research_crop_area{border-color:#22c55e!important}.zone-alley{border-color:#f97316!important}.zone-outside_research_field{border-color:#3b82f6!important}.zone-uncertain_boundary{border-color:#a855f7!important}.help{font-size:.76rem;line-height:1.35;color:#b9c4ce}.warning{color:#ffd166}.ok{color:#86efac}.policy{margin-top:6px;padding:6px;border-left:4px solid #67e8f9;background:#0f2a35;font-weight:700}#status{font-size:.82rem;margin-top:6px}.tool-status{font-weight:700;color:#67e8f9}
 @media(max-width:900px){.app{grid-template-columns:minmax(0,1fr) 340px}.button-grid button{min-width:115px}}
 </style></head><body><div class="app">
 <main class="workspace"><div class="viewer-toolbar">
@@ -41,9 +42,10 @@ button,select,input,textarea{font:inherit;color:inherit;background:#26313b;borde
 </div><div class="stage-wrap"><div class="stage"><canvas id="canvas" width="1100" height="780" aria-label="Field 2 area drawing canvas"></canvas></div></div></main>
 <aside class="side"><div class="side-top">
 <div class="row"><button id="previous">← Previous</button><button id="next">Next →</button><label>Cube <select id="cube"></select></label></div>
-<div id="progress"></div><div id="status">Loading frozen prediction-free layers…</div>
+<div id="progress"></div><div id="status">Loading frozen prediction-free layers…</div><div class="policy">Small overlaps are resolved automatically: outside &gt; alley &gt; uncertain &gt; research crop.</div>
 </div><div class="side-scroll">
 <label class="field"><span>Coverage mode</span><select id="coverage"><option value="">Choose coverage mode…</option></select></label>
+<div id="effectiveMode" class="help policy"></div>
 <div class="field"><span>Zone type</span><div id="zoneButtons" class="button-grid"></div></div>
 <div class="field"><span>Drawing and editing</span><div class="button-grid">
 <button id="draw">Draw polygon</button><button id="finish">Finish polygon</button><button id="cancelDrawing" class="danger">Cancel current polygon</button><button id="edit">Edit vertices</button><button id="insert">Insert vertex</button><button id="deleteVertex">Delete vertex</button><button id="movePolygon">Move polygon</button><button id="pan">Pan</button><button id="deletePolygon" class="danger">Delete polygon</button><button id="undo">Undo</button><button id="redo">Redo</button><button id="clearSelected" class="danger">Clear selected</button>
@@ -85,6 +87,9 @@ def handler_factory(store: Field2AreaAnnotationStore):
                 return self.send_bytes(json.dumps({
                     "coverage_modes": COVERAGE_MODES, "zone_types": ZONE_TYPES,
                     "zone_definitions": ZONE_DEFINITIONS,
+                    "pixel_domain_precedence_low_to_high": ZONE_PRECEDENCE,
+                    "precedence_rule": PRECEDENCE_RULE,
+                    "blank_mode_with_polygons": "mixed_manual_boundaries",
                     "confidence": CONFIDENCE_VALUES, "reserve_exposed": False,
                     "biological_labels_available": False, "default_layer": "natural_rgb",
                 }).encode(), "application/json")

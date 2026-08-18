@@ -182,6 +182,7 @@
   function cubeId() { return manifest[cubeIndex].cube_id; }
   function record() { return state.annotations[cubeId()]; }
   function dimensions() { return {width: manifest[cubeIndex].width, height: manifest[cubeIndex].height}; }
+  function effectiveCoverageMode(item) { return item.polygons.length ? "mixed_manual_boundaries" : item.coverage_mode; }
   function historyForCube() {
     if (!histories.has(cubeId())) histories.set(cubeId(), history(record().polygons));
     return histories.get(cubeId());
@@ -249,7 +250,7 @@
       if (polygons[first].zone_type !== polygons[second].zone_type && polygonsOverlap(polygons[first], polygons[second])) overlaps += 1;
     }
     const coverageWarning = polygons.length && record().coverage_mode !== "mixed_manual_boundaries";
-    $("audit").textContent = `${polygons.length} polygons · ${selfCount} self-intersections · ${overlaps} incompatible overlaps · ${outsideCount} beyond-raster warnings${outsideCount ? " (exact clipped fraction is written to the saved audit)" : ""}${coverageWarning ? " · polygons require mixed_manual_boundaries before review" : ""}`;
+    $("audit").textContent = `${polygons.length} polygons · ${selfCount} self-intersection warnings · ${overlaps} automatically resolved overlap warnings · ${outsideCount} beyond-raster warnings${outsideCount ? " (operational geometry is clipped; raw vertices are preserved)" : ""}${coverageWarning ? " · effective operational mode is mixed_manual_boundaries" : ""}`;
     $("audit").className = selfCount || overlaps || outsideCount || coverageWarning ? "help warning" : "help ok";
     const details = [];
     for (let first = 0; first < polygons.length; first += 1) for (let second = first + 1; second < polygons.length; second += 1) {
@@ -257,7 +258,7 @@
         details.push(`${polygons[first].polygon_id} (${polygons[first].zone_type}) ↔ ${polygons[second].polygon_id} (${polygons[second].zone_type})`);
       }
     }
-    $("auditDetails").textContent = details.length ? `Investigator correction required; no overlap priority is assigned:\n${details.join("\n")}` : "";
+    $("auditDetails").textContent = details.length ? `Raw overlaps retained for transparency; operational pixels use outside > alley > uncertain > research crop:\n${details.join("\n")}` : "";
   }
   function selectAt(point) {
     selectedPolygon = "";
@@ -313,6 +314,10 @@
   function renderForm() {
     const item = record();
     $("coverage").value = item.coverage_mode; $("confidence").value = item.confidence;
+    const effectiveMode = effectiveCoverageMode(item);
+    $("effectiveMode").textContent = item.polygons.length && item.coverage_mode !== "mixed_manual_boundaries"
+      ? `Raw coverage mode: ${item.coverage_mode || "blank"}. Effective operational mode: mixed_manual_boundaries (all ${item.polygons.length} polygons preserved).`
+      : `Effective operational mode: ${effectiveMode || "unassigned"}.`;
     $("reviewer").value = item.reviewer_identifier; $("notes").value = item.investigator_notes;
     $("review").textContent = item.reviewed ? "Reviewed ✓" : "Mark cube reviewed";
     $("unassignedStatus").textContent = item.treat_unassigned_valid_support_as_outside ? "Explicit action enabled: unassigned valid support will be outside field at freeze." : "Not enabled; unassigned support remains unassigned.";
@@ -415,11 +420,9 @@
   };
   $("review").onclick = () => {
     const item = record(), polygons = item.polygons;
-    const badGeometry = polygons.some((polygon) => selfIntersects(polygon.vertices_pixel)) || polygons.some((first, index) => polygons.slice(index + 1).some((second) => first.zone_type !== second.zone_type && polygonsOverlap(first, second)));
-    if (!item.coverage_mode || !item.confidence) return setStatus("Coverage mode and confidence are required before review.", true);
-    if (item.coverage_mode === "mixed_manual_boundaries" && !polygons.length) return setStatus("Mixed coverage requires at least one polygon.", true);
-    if (item.coverage_mode !== "mixed_manual_boundaries" && polygons.length) return setStatus("Clear polygons or choose mixed_manual_boundaries.", true);
-    if (badGeometry) return setStatus("Resolve self-intersections and incompatible overlaps before review.", true);
+    const effectiveMode = effectiveCoverageMode(item);
+    if (!effectiveMode || !item.confidence) return setStatus("An effective coverage mode and confidence are required before review.", true);
+    if (effectiveMode === "mixed_manual_boundaries" && !polygons.length) return setStatus("Mixed coverage requires at least one polygon.", true);
     item.reviewed = true; item.review_timestamp = new Date().toISOString(); dirty = true; renderForm(); setStatus("Cube marked reviewed; use Save all.", true);
   };
   $("save").onclick = save;

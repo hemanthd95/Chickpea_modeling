@@ -23,10 +23,18 @@ from chickpea_ssl.field2_area_review import (
     polygon_self_intersects,
     polygon_stage_counts,
 )
+from chickpea_ssl.field2_area_operational import (
+    PRECEDENCE_RULE,
+    compile_operational_membership,
+    effective_coverage_mode,
+    operationalize_polygon,
+    rasterize_operational_components,
+)
 from chickpea_ssl.field2_blind_review import PREVIEW_LAYERS, atomic_write_bytes, natural_rgb_png_bytes
 from chickpea_ssl.field2_readiness import sha256
 from scripts.freeze_field2_area_contract import membership_rows, validate_ready_payload
 from scripts.build_field2_area_reconciliation import reconciliation_rows
+from scripts.build_field2_area_operational_geometry import materialize
 from scripts.run_field2_area_annotator import HTML
 
 
@@ -218,7 +226,31 @@ def test_no_edit_save_keeps_all_annotation_artifacts_byte_identical(tmp_path):
     assert after == before
 
 
-def test_polygons_require_mixed_manual_boundaries_before_review(tmp_path):
+def test_operational_products_are_materialized_separately_from_raw_annotations(tmp_path):
+    store = make_area_store(tmp_path)
+    payload = store.load()
+    record = payload["annotations"]["field2_cube12"]
+    record.update(
+        coverage_mode="", polygons=[{
+            "polygon_id": "field2_cube12-crop", "zone_type": "research_crop_area",
+            "vertices_pixel": [{"x": 2, "y": 2}, {"x": 7, "y": 2}, {"x": 5, "y": 6}],
+        }],
+    )
+    store.save(payload)
+    raw_hash = sha256(store.json_path)
+    output = tmp_path / "derived-operational"
+    result = materialize(store, store.load(), output)
+    assert result["raw_polygon_count"] == 1 and result["source_annotation_sha256"] == raw_hash
+    assert sha256(store.json_path) == raw_hash
+    assert (output / "field2_area_operational_geometry.geojson").is_file()
+    assert (output / "field2_area_operational_geometry_audit.csv").is_file()
+    summary = pd.read_csv(output / "field2_area_operational_membership_summary.csv").fillna("")
+    cube12 = summary.loc[summary.cube_id == "field2_cube12"].iloc[0]
+    assert cube12.effective_operational_mode == "mixed_manual_boundaries"
+    assert cube12.raw_coverage_mode == ""
+
+
+def test_polygons_use_effective_mixed_mode_and_geometry_warnings_do_not_block_review(tmp_path):
     store = make_area_store(tmp_path)
     payload = store.normalize_payload(store.load())
     record = payload["annotations"]["field2_cube12"]
@@ -232,10 +264,35 @@ def test_polygons_require_mixed_manual_boundaries_before_review(tmp_path):
     )
     payload = store.normalize_payload(payload)
     issues = store.validate(payload)["field2_cube12"]
-    assert "polygons_require_mixed_manual_boundaries" in issues
+    assert issues == []
+    assert effective_coverage_mode(record) == "mixed_manual_boundaries"
     record = payload["annotations"]["field2_cube12"]
     record["coverage_mode"] = ""
-    assert "reviewed_requires_coverage_mode" in store.validate(payload)["field2_cube12"]
+    assert effective_coverage_mode(record) == "mixed_manual_boundaries"
+    assert store.validate(payload)["field2_cube12"] == []
+
+
+def test_self_intersection_and_overlap_are_review_warnings_not_validation_errors(tmp_path):
+    store = make_area_store(tmp_path)
+    payload = store.load(); record = payload["annotations"]["field2_cube12"]
+    record.update(
+        coverage_mode="", confidence="high", reviewed=True,
+        review_timestamp="2026-08-18T12:00:00+00:00",
+        polygons=[
+            {
+                "polygon_id": "bow", "zone_type": "research_crop_area",
+                "vertices_pixel": [{"x": 2, "y": 2}, {"x": 7, "y": 6}, {"x": 2, "y": 6}, {"x": 7, "y": 2}],
+            },
+            {
+                "polygon_id": "alley", "zone_type": "alley",
+                "vertices_pixel": [{"x": 3, "y": 2}, {"x": 8, "y": 2}, {"x": 8, "y": 7}, {"x": 3, "y": 7}],
+            },
+        ],
+    )
+    normalized = store.normalize_payload(payload)
+    assert store.validate(normalized)["field2_cube12"] == []
+    compiled = compile_operational_membership(normalized["annotations"]["field2_cube12"], store.support_mask("field2_cube12"))
+    assert compiled["precedence_applied"].any()
 
 
 def test_terminal_vertex_reconciliation_is_review_only_and_never_changes_source():
@@ -274,6 +331,28 @@ def test_area_freeze_refuses_until_all_40_cubes_are_reviewed(tmp_path):
         validate_ready_payload(store, store.load())
 
 
+def test_freeze_readiness_accepts_recoverable_geometry_warnings_after_all_reviews(tmp_path):
+    store = make_area_store(tmp_path); payload = store.load()
+    for record in payload["annotations"].values():
+        record.update(
+            coverage_mode="entire_support_research_field", confidence="high", reviewed=True,
+            review_timestamp="2026-08-18T12:00:00+00:00",
+        )
+    record = payload["annotations"]["field2_cube12"]
+    record.update(coverage_mode="", polygons=[
+        {
+            "polygon_id": "bow", "zone_type": "research_crop_area",
+            "vertices_pixel": [{"x": 2, "y": 2}, {"x": 7, "y": 6}, {"x": 2, "y": 6}, {"x": 7, "y": 2}],
+        },
+        {
+            "polygon_id": "alley", "zone_type": "alley",
+            "vertices_pixel": [{"x": 3, "y": 2}, {"x": 8, "y": 2}, {"x": 8, "y": 7}, {"x": 3, "y": 7}],
+        },
+    ])
+    normalized = store.normalize_payload(payload)
+    validate_ready_payload(store, normalized)
+
+
 def test_pixel_and_crs_vertices_round_trip_without_changing_originals():
     transform = Affine(0.02, 0, 487000, 0, -0.02, 3669000)
     pixel = [{"x": 2.25, "y": 3.75}, {"x": 9.5, "y": 3.75}, {"x": 5, "y": 7}]
@@ -306,6 +385,80 @@ def test_self_intersection_and_incompatible_zone_overlap_are_detected():
     assert len(overlap) == 1 and overlap[0]["overlap_support_pixels"] > 0
 
 
+def test_operational_terminal_and_validity_repairs_preserve_raw_vertices():
+    shape = (12, 12)
+    terminal = {
+        "polygon_id": "terminal", "zone_type": "research_crop_area",
+        "vertices_pixel": [
+            {"x": 1, "y": 1}, {"x": 9, "y": 1}, {"x": 9, "y": 9},
+            {"x": 1, "y": 9}, {"x": 3, "y": 0},
+        ],
+    }
+    remaining = {
+        "polygon_id": "remaining", "zone_type": "alley",
+        "vertices_pixel": [
+            {"x": 1, "y": 1}, {"x": 9, "y": 9}, {"x": 1, "y": 9},
+            {"x": 9, "y": 1}, {"x": 1.1, "y": 1.1},
+        ],
+    }
+    originals = json.loads(json.dumps([terminal, remaining]))
+    first = operationalize_polygon(terminal, shape)
+    second = operationalize_polygon(remaining, shape)
+    assert first["repair_method"] == "terminal_vertex_removed_operational_only"
+    assert second["repair_method"] == "raster_polygonize_make_valid"
+    assert second["component_count"] >= 1 and second["absolute_area_change_pixels2"] >= 0
+    for item in (first, second):
+        assert item["source_vertices_preserved"] is True
+        assert not item["operational_self_intersection"]
+        assert rasterize_operational_components(item["components"], shape).any()
+    assert [terminal, remaining] == originals
+
+
+def test_overlap_precedence_is_deterministic_and_records_all_raw_memberships():
+    support = np.ones((10, 10), dtype=bool)
+    vertices = [{"x": 1, "y": 1}, {"x": 8, "y": 1}, {"x": 8, "y": 8}, {"x": 1, "y": 8}]
+    polygons = [
+        {"polygon_id": zone, "zone_type": zone, "vertices_pixel": vertices}
+        for zone in ("alley", "research_crop_area", "outside_research_field", "uncertain_boundary")
+    ]
+    record = {"coverage_mode": "mixed_manual_boundaries", "polygons": polygons}
+    first = compile_operational_membership(record, support)
+    second = compile_operational_membership({**record, "polygons": list(reversed(polygons))}, support)
+    assert np.array_equal(first["winning_membership"], second["winning_membership"])
+    overlap = first["precedence_applied"]
+    assert overlap.any()
+    assert np.all(first["winning_membership"][overlap] == ZONE_CODES["outside_research_field"])
+    assert np.all(first["raw_membership_bitmask"][overlap] == 15)
+    assert first["precedence_rule"] == PRECEDENCE_RULE
+
+
+def test_current_225_polygons_all_operationalize_without_changing_raw_package():
+    source_path = Path("metadata/local/annotations/field2_area_zones/field2_area_annotations.json")
+    before_bytes = source_path.read_bytes(); payload = json.loads(before_bytes)
+    original = json.loads(json.dumps(payload))
+    support = pd.read_csv(
+        "metadata/local/reports/field2_valid_support/field2_valid_support_mask_manifest.csv"
+    ).set_index("cube_id")
+    methods = {}
+    count = 0
+    for cube_id in payload["cube_order"]:
+        shape = (int(support.loc[cube_id, "height"]), int(support.loc[cube_id, "width"]))
+        for polygon in payload["annotations"][cube_id]["polygons"]:
+            item = operationalize_polygon(polygon, shape)
+            methods[item["repair_method"]] = methods.get(item["repair_method"], 0) + 1
+            mask = rasterize_operational_components(item["components"], shape)
+            assert mask.any() and not item["operational_self_intersection"]
+            count += 1
+    assert count == 225
+    assert methods == {
+        "none": 171,
+        "terminal_vertex_removed_operational_only": 53,
+        "raster_polygonize_make_valid": 1,
+    }
+    assert payload == original and source_path.read_bytes() == before_bytes
+    assert sha256(source_path) == "7415888767d545514319cc5c175ee1b4ccc29015a4c44702775fa5ee73554b93"
+
+
 def test_entire_support_modes_and_explicit_unassigned_handling():
     support = np.ones((8, 10), dtype=bool); support[0, :] = False
     for mode, zone in (
@@ -327,14 +480,22 @@ def test_entire_support_modes_and_explicit_unassigned_handling():
 
 def test_exact_deterministic_point_zone_membership_omits_coordinates():
     mask = np.zeros((8, 10), dtype=np.uint8); mask[:, :5] = ZONE_CODES["research_crop_area"]; mask[:, 5:] = ZONE_CODES["outside_research_field"]
+    raw_bits = np.zeros((8, 10), dtype=np.uint8); raw_bits[:, :5] = 1; raw_bits[:, 5:] = 8
+    compiled = {"cube": {
+        "winning_membership": mask, "raw_membership_bitmask": raw_bits,
+        "precedence_applied": np.zeros((8, 10), dtype=bool),
+        "effective_coverage_mode": "mixed_manual_boundaries",
+    }}
     frame = pd.DataFrame([
         {"sample_id": "one", "cube_id": "cube", "cube_evaluation_role": "primary_three_class", "row": 2, "column": 3},
         {"sample_id": "two", "cube_id": "cube", "cube_evaluation_role": "primary_three_class", "row": 2, "column": 7},
     ])
-    first = membership_rows(frame, {"cube": mask}, "main")
-    assert first == membership_rows(frame, {"cube": mask}, "main")
+    first = membership_rows(frame, compiled, "main")
+    assert first == membership_rows(frame, compiled, "main")
     assert [item["zone_type"] for item in first] == ["research_crop_area", "outside_research_field"]
     assert all("row" not in item and "column" not in item for item in first)
+    assert first[0]["raw_zone_memberships"] == "research_crop_area"
+    assert first[1]["winning_operational_membership"] == "outside_research_field"
     assert first[0]["primary_external_validation_eligible"] is True
     assert first[1]["supplementary_or_domain_shift"] is True
 
@@ -349,6 +510,9 @@ def test_area_ui_is_sticky_complete_and_has_no_biological_or_reserve_controls():
         assert f'value="{layer}"' in HTML
     assert "biological label" in HTML.lower()
     assert "investigator-identified planted-row/research-plot domain; not a biological chickpea label" in HTML
+    assert "Small overlaps are resolved automatically: outside &gt; alley &gt; uncertain &gt; research crop." in HTML
+    assert 'id="effectiveMode"' in HTML
+    assert "operational pixels use outside > alley > uncertain > research crop" in javascript
     assert 'canvas.addEventListener("click"' in javascript
     assert 'event.detail === 2' in javascript
     assert "displayed_vertex_count" in javascript and "clipped_vertex_count" in javascript
@@ -364,9 +528,12 @@ def test_area_coverage_modes_are_exact_and_no_automatic_inference_tools_are_impo
     }
     config = __import__("yaml").safe_load(Path("configs/field2_area_annotation.yaml").read_text())
     assert config["annotation"]["zone_definitions"] == ZONE_DEFINITIONS
+    assert config["operational_geometry"]["precedence_rule"] == PRECEDENCE_RULE
+    assert config["operational_geometry"]["blank_mode_with_polygons"] == "mixed_manual_boundaries"
     prohibited = {"torch", "tensorflow", "xgboost", "sklearn", "cv2", "shapely"}
     for path in (
         Path("chickpea_ssl/field2_area_review.py"), Path("scripts/run_field2_area_annotator.py"),
+        Path("chickpea_ssl/field2_area_operational.py"), Path("scripts/build_field2_area_operational_geometry.py"),
         Path("scripts/freeze_field2_area_contract.py"), Path("scripts/validate_field2_source_support_contracts.py"),
     ):
         tree = __import__("ast").parse(path.read_text())
