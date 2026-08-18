@@ -954,3 +954,21 @@ corrections.
   and RGB-display validators passed. The live API still exposes exactly 800 main
   samples and no reserve samples; sampling, display, and annotation hashes are
   unchanged.
+
+
+### Prediction-free Field 2 area annotation prepared
+
+- Added a separate port-8774 area annotator for investigator-defined research
+  crop area, alley, outside-field, and uncertain-boundary contextual domains.
+- Added full polygon drawing/editing, undo/redo, pan/zoom, support-aware geometry
+  audits, pixel/CRS vertices, atomic JSON/GeoJSON/CSV/audit/overview save outputs,
+  and an explicit—not silent—unassigned-support outside-field action.
+- Implemented but did not execute a write-once freeze workflow requiring all 40
+  cubes reviewed; it builds deterministic support-clipped masks and coordinate-
+  free main/locked-reserve memberships without assigning biological labels.
+- Blocked point annotation until the area contract is frozen, added immutable
+  zone/domain display, alley label restrictions, boundary-correction handling,
+  and the pre-freeze `weed_soil_mixed` biological option.
+- All 108 tests and every frozen Field 1/Field 2 source, support, role, sampling,
+  and RGB validator passed. Point labels/reviews remain zero; all sampling and
+  point-annotation hashes are unchanged.

@@ -56,6 +56,7 @@ POINT_LABELS = (
     "soil",
     "chickpea_soil_mixed",
     "chickpea_weed_mixed",
+    "weed_soil_mixed",
     "uncertain",
     "nodata_invalid",
 )

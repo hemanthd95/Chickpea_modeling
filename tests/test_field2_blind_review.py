@@ -533,8 +533,11 @@ def test_future_point_labels_preserve_tall_grass():
     }
     assert set(POINT_LABELS) == {
         "chickpea", "ordinary_weed", "tall_grass_weed", "soil",
-        "chickpea_soil_mixed", "chickpea_weed_mixed", "uncertain", "nodata_invalid",
+        "chickpea_soil_mixed", "chickpea_weed_mixed", "weed_soil_mixed",
+        "uncertain", "nodata_invalid",
     }
+    config = yaml.safe_load(Path("configs/field2_blind_evaluation.yaml").read_text())
+    assert config["point_annotation"]["labels"] == list(POINT_LABELS)
 
 
 def make_main_annotation_frame(manifest_path: Path) -> pd.DataFrame:
@@ -577,10 +580,13 @@ def make_natural_rgb_manifest(tmp_path: Path, cube_ids=("field2_cube02", "field2
     return pd.DataFrame(rows)
 
 
-def make_point_store(tmp_path: Path, frame: pd.DataFrame, manifest_path: Path) -> PointAnnotationStore:
+def make_point_store(
+    tmp_path: Path, frame: pd.DataFrame, manifest_path: Path, area_contract_hash: str = "",
+) -> PointAnnotationStore:
     return PointAnnotationStore(
         tmp_path, frame, "b" * 64, manifest_path, make_natural_rgb_manifest(tmp_path),
         "field2_annotation_display_natural_rgb_v1", "c" * 64, tmp_path / "points",
+        area_contract_hash,
     )
 
 
@@ -633,6 +639,29 @@ def test_point_viewer_exposes_required_controls_and_nonblocking_overlay_contract
     assert 'button.addEventListener("click", () => setChoice' in viewer_js
     assert '$("save").addEventListener("click", save)' in viewer_js
     assert '$("review").addEventListener("click"' in viewer_js
+
+
+def test_point_schema_adds_weed_soil_mixed_and_enforces_alley_labels_and_boundary_workflow(tmp_path):
+    manifest_path = make_review_manifest(tmp_path)
+    frame = make_main_annotation_frame(manifest_path)
+    frame["zone_type"] = "alley"
+    frame["domain"] = "alley"
+    store = make_point_store(tmp_path, frame, manifest_path, "d" * 64)
+    payload = store.load()
+    record = payload["annotations"]["sample-0000"]
+    assert record["selected_label"] == "" and record["boundary_needs_correction"] is False
+    assert record["zone_type"] == "alley" and record["area_zone_contract_sha256"] == "d" * 64
+    record["selected_label"] = "chickpea"
+    assert "label_not_allowed_in_alley" in store.validate(payload)["sample-0000"]
+    record["selected_label"] = "weed_soil_mixed"
+    record["boundary_needs_correction"] = True
+    assert "boundary_correction_must_not_force_label" in store.validate(payload)["sample-0000"]
+    record["selected_label"] = ""
+    assert store.validate(payload)["sample-0000"] == []
+    viewer_js = Path("scripts/field2_point_viewer.js").read_text()
+    assert "schema.alley_labels" in viewer_js
+    assert '$("boundaryCorrection")' in viewer_js
+    assert "Frozen zone:" in viewer_js
 
 
 def test_frozen_sampling_and_annotation_display_hashes_are_still_exact():

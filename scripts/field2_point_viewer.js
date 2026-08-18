@@ -223,6 +223,15 @@
     selectedConfidence = record.confidence;
     chooseButtons("labelButtons", selectedLabel);
     chooseButtons("confidenceButtons", selectedConfidence);
+    const alley = sample.zone_type === "alley";
+    const allowed = new Set(alley ? schema.alley_labels : schema.labels);
+    for (const button of $("labelButtons").querySelectorAll("button")) {
+      button.disabled = !allowed.has(button.dataset.value);
+      button.title = button.disabled ? "This biological label is unavailable for an investigator-confirmed alley point." : "";
+    }
+    $("zoneMembership").textContent = `Frozen zone: ${sample.zone_type.replaceAll("_", " ")} · domain: ${sample.domain.replaceAll("_", " ")}${sample.primary_external_validation_eligible ? " · primary external validation" : " · reported separately/supplementary"}`;
+    $("boundaryCorrection").setAttribute("aria-pressed", String(record.boundary_needs_correction));
+    $("boundaryCorrection").classList.toggle("active", record.boundary_needs_correction);
     $("reviewer").value = record.reviewer_identifier;
     $("note").value = record.investigator_note;
     $("review").textContent = record.reviewed && !record.requires_visual_rereview ? "Reviewed ✓" : "Mark reviewed";
@@ -230,7 +239,7 @@
     $("contradiction").textContent = record.role_contradiction ? "ROLE CONTRADICTION RECORDED: investigator selected chickpea on a frozen absent-negative-control cube." : "";
     const item = manifest[sample.cube_id];
     const wavelengths = item.natural_rgb_wavelengths_nm;
-    $("metadata").textContent = `sample ID: ${sample.sample_id}\ncube ID: ${sample.cube_id}\nfrozen row, column: ${sample.row}, ${sample.column}\ninspection row, column: ${viewerState.inspection.row}, ${viewerState.inspection.column}\nfrozen cube role: ${sample.cube_evaluation_role}\ncube notes: ${sample.cube_investigator_notes || "(none)"}\nRGB wavelengths: ${wavelengths.red} / ${wavelengths.green} / ${wavelengths.blue} nm\ndisplay version: ${record.annotation_display_version}\nrank stratum: ${sample.scalar_index_rank_stratum}\nspatial block: ${sample.spatial_group_id}\nframe: MAIN only`;
+    $("metadata").textContent = `sample ID: ${sample.sample_id}\ncube ID: ${sample.cube_id}\nfrozen row, column: ${sample.row}, ${sample.column}\ninspection row, column: ${viewerState.inspection.row}, ${viewerState.inspection.column}\nfrozen cube role: ${sample.cube_evaluation_role}\nzone: ${sample.zone_type}\ndomain: ${sample.domain}\nRGB wavelengths: ${wavelengths.red} / ${wavelengths.green} / ${wavelengths.blue} nm\ndisplay version: ${record.annotation_display_version}\nframe: MAIN only`;
     const reviewed = Object.values(annotations.annotations).filter((item) => item.reviewed).length;
     const rereview = Object.values(annotations.annotations).filter((item) => item.requires_visual_rereview).length;
     $("counter").textContent = `${sampleIndex + 1} / ${visible.length} filtered · ${reviewed}/800 reviewed · ${rereview} re-review`;
@@ -367,16 +376,23 @@
     $("showInspection").addEventListener("change", () => { $("inspectionPanel").classList.toggle("hidden", !$("showInspection").checked); renderCanvases(); });
     $("reviewer").addEventListener("change", updateAnnotation);
     $("note").addEventListener("change", updateAnnotation);
+    $("boundaryCorrection").addEventListener("click", () => {
+      const record = currentRecord();
+      record.boundary_needs_correction = !record.boundary_needs_correction;
+      if (record.boundary_needs_correction) { selectedLabel = ""; record.selected_label = ""; }
+      record.reviewed = false; record.review_timestamp = ""; setDirty(); renderForm();
+    });
     $("review").addEventListener("click", () => {
       updateAnnotation();
       const record = currentRecord();
+      if (record.boundary_needs_correction) return setStatus("Save the boundary-needs-correction flag; do not force a biological label.", true);
       if (!selectedLabel || !selectedConfidence) return setStatus("Select a label and confidence before marking reviewed.", true);
       record.reviewed = true; record.review_timestamp = new Date().toISOString(); record.requires_visual_rereview = false; setDirty(); render();
     });
     $("clear").addEventListener("click", () => {
       if (!confirm("Clear this MAIN annotation?")) return;
       const sample = currentSample(); const old = currentRecord();
-      annotations.annotations[sample.sample_id] = { sample_id: sample.sample_id, cube_id: sample.cube_id, frozen_cube_role: sample.cube_evaluation_role, selected_label: "", confidence: "", investigator_note: "", reviewed: false, review_timestamp: "", reviewer_identifier: "", role_contradiction: false, source_preview_checksums: JSON.parse(sample.source_preview_checksums), sampling_frame_sha256: annotations.sampling_frame_sha256, annotation_display_version: annotations.annotation_display_version, annotation_display_contract_sha256: annotations.annotation_display_contract_sha256, natural_rgb_preview_sha256: old.natural_rgb_preview_sha256, requires_visual_rereview: false };
+      annotations.annotations[sample.sample_id] = { sample_id: sample.sample_id, cube_id: sample.cube_id, frozen_cube_role: sample.cube_evaluation_role, selected_label: "", confidence: "", investigator_note: "", reviewed: false, review_timestamp: "", reviewer_identifier: "", role_contradiction: false, source_preview_checksums: JSON.parse(sample.source_preview_checksums), sampling_frame_sha256: annotations.sampling_frame_sha256, annotation_display_version: annotations.annotation_display_version, annotation_display_contract_sha256: annotations.annotation_display_contract_sha256, natural_rgb_preview_sha256: old.natural_rgb_preview_sha256, requires_visual_rereview: false, area_zone_contract_sha256: old.area_zone_contract_sha256, zone_type: old.zone_type, domain: old.domain, boundary_needs_correction: false };
       setDirty(); render();
     });
     $("save").addEventListener("click", save);
@@ -399,6 +415,7 @@
       fetch("/api/schema").then((response) => response.json()), fetch("/api/annotations").then((response) => response.json()),
     ]);
     if (samples.length !== 800 || new Set(samples.map((item) => item.sampling_frame)).size !== 1 || samples[0].sampling_frame !== "main" || schema.reserve_exposed) throw new Error("Expected exact frozen 800-point MAIN frame with reserve locked");
+    if (!schema.area_geometry_frozen || !samples.every((item) => item.zone_type && item.domain)) throw new Error("Frozen area-zone membership is required before point annotation");
     if (schema.default_layer !== "natural_rgb" || schema.display_version !== annotations.annotation_display_version) throw new Error("Natural RGB display provenance mismatch");
     buildChoices(); bindControls(); bindViewerEvents();
     for (const value of ["", ...new Set(samples.map((item) => item.cube_id))]) { const option = document.createElement("option"); option.value = value; option.textContent = value || "All cubes"; $("cubeFilter").appendChild(option); }

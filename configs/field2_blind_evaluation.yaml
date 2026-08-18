@@ -168,6 +168,7 @@ point_annotation:
     - soil
     - chickpea_soil_mixed
     - chickpea_weed_mixed
+    - weed_soil_mixed
     - uncertain
     - nodata_invalid
   output_root: metadata/local/annotations/field2_blind_points
