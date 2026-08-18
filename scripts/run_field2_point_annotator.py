@@ -269,7 +269,7 @@ class PointAnnotationStore:
         return self.project / str(getattr(self.manifest[cube_id], f"{layer}_path"))
 
 
-HTML = r'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Field 2 blind MAIN point annotator</title>
+LEGACY_NONINTERACTIVE_HTML = r'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Field 2 blind MAIN point annotator</title>
 <style>:root{color-scheme:dark;font-family:system-ui,sans-serif}*{box-sizing:border-box}body{margin:0;background:#101418;color:#edf2f7}header{padding:9px 12px;background:#182028;position:sticky;top:0;z-index:5;border-bottom:1px solid #3f4b56}.bar{display:flex;flex-wrap:wrap;gap:7px;align-items:center}button,select,input,textarea{font:inherit;color:inherit;background:#26313b;border:1px solid #52606d;border-radius:5px;padding:6px}.primary{background:#18794e}.danger{background:#7f1d1d}.layout{display:grid;grid-template-columns:minmax(0,1fr) 390px;height:calc(100vh - 126px)}.stage{display:grid;grid-template-columns:minmax(260px,1fr) minmax(320px,1.15fr);gap:10px;padding:10px;overflow:auto;background:#050708}.panel{display:flex;min-width:0;flex-direction:column;align-items:center;justify-content:center;gap:5px}.panel-title{font-size:.8rem;color:#b9c4ce}canvas{display:block;max-width:100%;max-height:calc(100vh - 190px);border:1px solid #52606d;background:#000}.overview{image-rendering:auto}.detail{image-rendering:pixelated}.form{padding:12px;overflow:auto;background:#151b21}.field{display:block;margin:8px 0}.field span{display:block;color:#b9c4ce;font-size:.84rem}.form textarea,.form input,.form select{width:100%}#status{padding-top:7px}.dirty,.warning{color:#ffd166}.rereview{color:#ff9f1c}.help{font-size:.78rem;color:#b9c4ce}.metadata{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:.8rem}@media(max-width:1100px){.stage{grid-template-columns:1fr}.layout{grid-template-columns:minmax(0,1fr) 350px}canvas{max-height:42vh}}@media(max-width:760px){.layout{grid-template-columns:1fr;height:auto}.form{max-height:none}}</style></head><body>
 <header><div class="bar"><button id="prev">← Previous</button><span id="counter"></span><button id="next">Next →</button><label>Cube <select id="cubeFilter"></select></label><label>Role <select id="roleFilter"></select></label><label>Review <select id="reviewFilter"><option value="">All records</option><option value="rereview">Requires visual re-review</option></select></label><label>View <select id="layer"><option value="natural_rgb">Natural RGB (default)</option><option value="false_colour">False colour reflectance</option><option value="pca">PCA</option><option value="stored_index">Stored scalar index</option><option value="support_outline">Support boundary</option></select></label><label>Zoom <select id="zoom"><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select></label><label><input id="grid" type="checkbox"> Pixel grid ≥8×</label><button id="save" class="primary">Save all</button></div><div id="status">Loading frozen MAIN frame…</div><div class="help">Shortcuts: ←/→ navigate · N/F/P/I/B views · 2/4/8/X zoom · G grid · Ctrl/Cmd+S saves. The outlined square is the exact sampled pixel; surrounding pixels are context only.</div></header>
 <div class="layout"><div class="stage"><section class="panel"><div class="panel-title">Complete cube overview</div><canvas id="overview" class="overview"></canvas></section><section class="panel"><div class="panel-title">Magnified sampled-pixel neighborhood</div><canvas id="detail" class="detail" width="640" height="640"></canvas></section></div><aside class="form"><h3>Investigator annotation</h3><label class="field"><span>Selected label (no default)</span><select id="label"><option value="">Unlabeled</option></select></label><label class="field"><span>Confidence</span><select id="confidence"><option value="">Not set</option></select></label><label class="field"><span>Reviewer identifier (optional)</span><input id="reviewer"></label><label class="field"><span>Investigator note (optional)</span><textarea id="note"></textarea></label><button id="review" class="primary">Mark reviewed</button> <button id="clear" class="danger">Clear current</button><p id="rereview" class="rereview"></p><p id="contradiction" class="warning"></p><h3>Frozen sample metadata</h3><div id="metadata" class="metadata"></div><p class="help">Mixed labels apply only when the sampled pixel is spatially mixed. Uncertainty is preferable to a forced class. Chickpea remains available on negative-control cubes; selecting it records a role contradiction without changing the frozen cube role. Reserve samples are locked and unavailable here.</p></aside></div>
@@ -286,6 +286,45 @@ async function init(){samples=await(await fetch('/api/samples')).json();manifest
 </script></body></html>'''
 
 
+HTML = r'''<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Field 2 blind MAIN point annotator</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif}*{box-sizing:border-box}
+body{margin:0;background:#101418;color:#edf2f7}header{padding:9px 12px;background:#182028;position:sticky;top:0;z-index:10;border-bottom:1px solid #3f4b56}
+.bar,.button-group{display:flex;flex-wrap:wrap;gap:7px;align-items:center}button,select,input,textarea{font:inherit;color:inherit;background:#26313b;border:1px solid #52606d;border-radius:5px;padding:6px}
+button{cursor:pointer}.primary{background:#18794e}.danger{background:#7f1d1d}.active{outline:2px solid #67e8f9;outline-offset:1px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 390px;height:calc(100vh - 142px)}.stage{display:grid;grid-template-columns:minmax(420px,1.5fr) minmax(260px,.8fr);grid-template-rows:1fr 1fr;gap:10px;padding:10px;overflow:auto;background:#050708}
+.panel{display:flex;min-width:0;min-height:0;flex-direction:column;align-items:center;justify-content:center;gap:5px}.main-panel{grid-row:1/3}.panel-title{font-size:.82rem;color:#b9c4ce}
+canvas{display:block;max-width:100%;border:1px solid #52606d;background:#000;touch-action:none;position:relative;z-index:1}.viewer{width:min(100%,900px);height:auto;cursor:crosshair;image-rendering:pixelated}.viewer.dragging{cursor:grabbing}.magnifier{width:min(100%,360px);height:auto;image-rendering:pixelated}
+.legend{display:flex;gap:16px;font-size:.8rem}.yellow{color:#ffd166}.cyan{color:#67e8f9}.form{padding:12px;overflow:auto;background:#151b21;position:relative;z-index:2}.field{display:block;margin:8px 0}.field span{display:block;color:#b9c4ce;font-size:.84rem}.form textarea,.form input,.form select{width:100%}
+.choice{min-width:94px;text-transform:capitalize}.choice[aria-pressed=true]{background:#075985;border-color:#67e8f9}.confidence-choice[aria-pressed=true]{background:#166534}.message{margin:7px 0;color:#ffd166;font-weight:600}#status{padding-top:7px}.dirty,.warning{color:#ffd166}.rereview{color:#ff9f1c}.help{font-size:.78rem;color:#b9c4ce}.metadata{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:.8rem}
+.controls-shield{pointer-events:none;position:absolute;inset:0;z-index:-1}.hidden{display:none!important}
+@media(max-width:1100px){.stage{grid-template-columns:1fr;grid-template-rows:auto}.main-panel{grid-row:auto}.layout{grid-template-columns:minmax(0,1fr) 350px}}
+@media(max-width:760px){.layout{grid-template-columns:1fr;height:auto}.form{max-height:none}}
+</style></head><body>
+<header><div class="bar">
+<button id="prev">← Previous</button><span id="counter"></span><button id="next">Next →</button>
+<label>Cube <select id="cubeFilter"></select></label><label>Role <select id="roleFilter"></select></label>
+<label>Review <select id="reviewFilter"><option value="">All records</option><option value="rereview">Requires visual re-review</option></select></label>
+<label>View <select id="layer"><option value="natural_rgb">Natural RGB (default)</option><option value="false_colour">False colour reflectance</option><option value="pca">PCA</option><option value="stored_index">Stored scalar index</option><option value="support_outline">Support boundary</option></select></label>
+<span>Zoom</span><button class="zoom-choice" data-zoom="2">2×</button><button class="zoom-choice" data-zoom="4">4×</button><button class="zoom-choice" data-zoom="8">8×</button><button class="zoom-choice" data-zoom="16">16×</button><button id="resetView">Reset view</button>
+<label><input id="grid" type="checkbox" checked> Pixel grid at 8×/16×</label><label><input id="showInspection" type="checkbox" checked> Inspection magnifier</label><button id="save" class="primary">Save all</button>
+</div><div id="status">Loading frozen MAIN frame…</div><div id="safetyMessage" class="message">Sample location is frozen; clicking only changes the inspection view.</div>
+<div class="help">Mouse wheel zooms · click changes inspection only · drag pans · shortcuts: ←/→ navigate · N/F/P/I/B layers · 2/4/8/X zoom · 0 reset · G grid · Ctrl/Cmd+S save.</div></header>
+<div class="layout"><div class="stage">
+<section class="panel main-panel"><div class="panel-title">Interactive cube view</div><canvas id="viewer" class="viewer" width="900" height="700" aria-label="Interactive cube view"></canvas><div class="legend"><span class="yellow">□ Frozen sample</span><span class="cyan">＋ Inspection location</span></div></section>
+<section class="panel"><div class="panel-title">Frozen sample magnifier</div><canvas id="frozenMagnifier" class="magnifier" width="360" height="300" aria-label="Frozen sample magnifier"></canvas></section>
+<section class="panel" id="inspectionPanel"><div class="panel-title">Inspection magnifier</div><canvas id="inspectionMagnifier" class="magnifier" width="360" height="300" aria-label="Inspection magnifier"></canvas></section>
+</div><aside class="form"><div class="controls-shield" aria-hidden="true"></div><h3>Investigator annotation</h3>
+<div class="field"><span>Selected label (no default)</span><div id="labelButtons" class="button-group" role="group" aria-label="Selected label"></div></div>
+<div class="field"><span>Confidence</span><div id="confidenceButtons" class="button-group" role="group" aria-label="Confidence"></div></div>
+<label class="field"><span>Reviewer identifier (optional)</span><input id="reviewer"></label><label class="field"><span>Investigator note (optional)</span><textarea id="note"></textarea></label>
+<button id="review" class="primary">Mark reviewed</button> <button id="clear" class="danger">Clear current</button><p id="rereview" class="rereview"></p><p id="contradiction" class="warning"></p>
+<h3>Frozen sample metadata</h3><div id="metadata" class="metadata"></div><p class="help">Image interaction is visual inspection only and never assigns a biological class. Mixed labels apply only when the sampled pixel is spatially mixed. Reserve samples are locked and unavailable.</p>
+</aside></div><script src="/field2-point-viewer.js"></script></body></html>'''
+
+
 def handler_factory(store: PointAnnotationStore):
     class Handler(BaseHTTPRequestHandler):
         def send_bytes(self, content: bytes, content_type: str, status: int = 200):
@@ -293,6 +332,9 @@ def handler_factory(store: PointAnnotationStore):
         def do_GET(self):
             clean = self.path.split("?", 1)[0]
             if clean in {"/", "/index.html"}: return self.send_bytes(HTML.encode(), "text/html; charset=utf-8")
+            if clean == "/field2-point-viewer.js":
+                viewer_js = Path(__file__).with_name("field2_point_viewer.js")
+                return self.send_bytes(viewer_js.read_bytes(), "text/javascript; charset=utf-8")
             if clean == "/api/samples": return self.send_bytes(store.frame.to_json(orient="records").encode(), "application/json")
             if clean == "/api/manifest": return self.send_bytes(json.dumps(store.public_manifest()).encode(), "application/json")
             if clean == "/api/annotations": return self.send_bytes(json.dumps(store.load()).encode(), "application/json")

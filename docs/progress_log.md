@@ -937,3 +937,20 @@ corrections.
   validators passed; frozen main/reserve/combined hashes remained unchanged.
 - No checkpoint, prediction, probability, pseudo-label, suggested class,
   training, Field 1 label, PCA value, or stored-index value entered RGB.
+
+
+### Field 2 point-viewer interaction fixed
+
+- Diagnosed the inert image as missing canvas pointer/wheel listeners; Firefox
+  found no JavaScript errors, overlay interception, or control hit-test failure.
+- Added an immutable yellow sampled-pixel outline and independent cyan inspection
+  cursor, click-to-inspect magnifier, wheel zoom, drag pan, reset, exact
+  2×/4×/8×/16× controls, high-zoom grid, and nearest-neighbor rendering.
+- Kept natural RGB as default and retained false-color, PCA, stored-index, and
+  support views without changing the frozen sample on layer switches.
+- Replaced label/confidence selects with explicit clickable buttons and verified
+  all form, navigation, save, review, layer, and zoom controls remain unobstructed.
+- All 97 tests and the frozen Field 1 finalization, Field 2 cube-role, sampling,
+  and RGB-display validators passed. The live API still exposes exactly 800 main
+  samples and no reserve samples; sampling, display, and annotation hashes are
+  unchanged.

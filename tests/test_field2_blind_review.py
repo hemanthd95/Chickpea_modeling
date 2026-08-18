@@ -2,6 +2,7 @@ import ast
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -43,7 +44,7 @@ from chickpea_ssl.field2_blind_review import (
 )
 from chickpea_ssl.field2_readiness import sha256
 from scripts.build_field2_blind_annotation_sampling_frame import collapsed_cube_candidates
-from scripts.run_field2_point_annotator import PointAnnotationStore
+from scripts.run_field2_point_annotator import HTML, PointAnnotationStore
 
 
 def test_configuration_freezes_exact_40_cube_inventory():
@@ -580,6 +581,75 @@ def make_point_store(tmp_path: Path, frame: pd.DataFrame, manifest_path: Path) -
     return PointAnnotationStore(
         tmp_path, frame, "b" * 64, manifest_path, make_natural_rgb_manifest(tmp_path),
         "field2_annotation_display_natural_rgb_v1", "c" * 64, tmp_path / "points",
+    )
+
+
+def test_point_viewer_model_freezes_sample_and_separates_inspection_pan_zoom_reset_and_layer():
+    source = Path("scripts/field2_point_viewer.js").resolve()
+    javascript = f"""
+const assert = require('assert');
+const viewer = require({json.dumps(str(source))});
+const initial = viewer.createState({{row: 17, column: 23}}, 100, 80);
+const clicked = viewer.inspect(initial, 42.8, 51.2);
+assert.deepStrictEqual(clicked.frozen, {{row: 17, column: 23}});
+assert.deepStrictEqual(clicked.inspection, {{row: 42, column: 51}});
+assert.deepStrictEqual(initial.inspection, {{row: 17, column: 23}});
+const zoomed = viewer.setZoom(clicked, 8);
+assert.strictEqual(zoomed.zoom, 8);
+const panned = viewer.pan(zoomed, 80, -40, zoomed.zoom);
+assert.deepStrictEqual(panned.center, {{x: 40, y: 45}});
+assert.deepStrictEqual(panned.frozen, initial.frozen);
+const switched = viewer.switchLayer(panned, 'pca');
+assert.strictEqual(switched.layer, 'pca');
+assert.deepStrictEqual(switched.frozen, initial.frozen);
+assert.deepStrictEqual(switched.inspection, clicked.inspection);
+const reset = viewer.reset(switched);
+assert.strictEqual(reset.zoom, 0);
+assert.deepStrictEqual(reset.center, {{x: 50, y: 40}});
+assert.deepStrictEqual(reset.inspection, reset.frozen);
+assert.deepStrictEqual(reset.frozen, {{row: 17, column: 23}});
+"""
+    result = subprocess.run(["node", "-e", javascript], text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+
+
+def test_point_viewer_exposes_required_controls_and_nonblocking_overlay_contract():
+    viewer_js = Path("scripts/field2_point_viewer.js").read_text()
+    assert "Sample location is frozen; clicking only changes the inspection view." in HTML
+    for element_id in (
+        "viewer", "frozenMagnifier", "inspectionMagnifier", "resetView", "layer",
+        "prev", "next", "save", "review", "reviewer", "note", "labelButtons",
+        "confidenceButtons",
+    ):
+        assert f'id="{element_id}"' in HTML
+    for layer in ("natural_rgb", "false_colour", "pca", "stored_index", "support_outline"):
+        assert f'value="{layer}"' in HTML
+    for zoom in (2, 4, 8, 16):
+        assert f'data-zoom="{zoom}"' in HTML
+    assert ".controls-shield{pointer-events:none" in HTML
+    assert 'viewer.addEventListener("pointerdown"' in viewer_js
+    assert 'viewer.addEventListener("pointermove"' in viewer_js
+    assert 'viewer.addEventListener("wheel"' in viewer_js
+    assert 'button.addEventListener("click", () => setChoice' in viewer_js
+    assert '$("save").addEventListener("click", save)' in viewer_js
+    assert '$("review").addEventListener("click"' in viewer_js
+
+
+def test_frozen_sampling_and_annotation_display_hashes_are_still_exact():
+    sampling_contract = yaml.safe_load(
+        Path("metadata/local/contracts/field2_blind_sampling_frame_contract.yaml").read_text()
+    )
+    assert sampling_contract["main_count"] == 800
+    assert sampling_contract["reserve_count"] == 396
+    for item in ("main", "reserve", "combined"):
+        frozen = sampling_contract["frozen_outputs"][item]
+        assert sha256(Path(frozen["path"])) == frozen["sha256"]
+    display_contract = Path("metadata/local/contracts/field2_annotation_display_addendum.yaml")
+    assert sha256(display_contract) == "1854458fb428b7c4b7eb1ec15bbc5b354dc21573f35944ef2cefbbb36ef08a7f"
+    display = yaml.safe_load(display_contract.read_text())
+    assert display["cube_count"] == 40
+    assert display["input_contracts"]["sampling_contract"]["sha256"] == sha256(
+        Path(display["input_contracts"]["sampling_contract"]["path"])
     )
 
 
