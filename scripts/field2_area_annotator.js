@@ -182,7 +182,7 @@
   function cubeId() { return manifest[cubeIndex].cube_id; }
   function record() { return state.annotations[cubeId()]; }
   function dimensions() { return {width: manifest[cubeIndex].width, height: manifest[cubeIndex].height}; }
-  function effectiveCoverageMode(item) { return item.polygons.length ? "mixed_manual_boundaries" : item.coverage_mode; }
+  function effectiveCoverageMode(item) { return item.coverage_mode || (item.polygons.length ? "mixed_manual_boundaries" : ""); }
   function historyForCube() {
     if (!histories.has(cubeId())) histories.set(cubeId(), history(record().polygons));
     return histories.get(cubeId());
@@ -249,7 +249,7 @@
     for (let first = 0; first < polygons.length; first += 1) for (let second = first + 1; second < polygons.length; second += 1) {
       if (polygons[first].zone_type !== polygons[second].zone_type && polygonsOverlap(polygons[first], polygons[second])) overlaps += 1;
     }
-    const coverageWarning = polygons.length && record().coverage_mode !== "mixed_manual_boundaries";
+    const coverageWarning = polygons.length && !record().coverage_mode;
     $("audit").textContent = `${polygons.length} polygons · ${selfCount} self-intersection warnings · ${overlaps} automatically resolved overlap warnings · ${outsideCount} beyond-raster warnings${outsideCount ? " (operational geometry is clipped; raw vertices are preserved)" : ""}${coverageWarning ? " · effective operational mode is mixed_manual_boundaries" : ""}`;
     $("audit").className = selfCount || overlaps || outsideCount || coverageWarning ? "help warning" : "help ok";
     const details = [];
@@ -315,7 +315,7 @@
     const item = record();
     $("coverage").value = item.coverage_mode; $("confidence").value = item.confidence;
     const effectiveMode = effectiveCoverageMode(item);
-    $("effectiveMode").textContent = item.polygons.length && item.coverage_mode !== "mixed_manual_boundaries"
+    $("effectiveMode").textContent = item.polygons.length && !item.coverage_mode
       ? `Raw coverage mode: ${item.coverage_mode || "blank"}. Effective operational mode: mixed_manual_boundaries (all ${item.polygons.length} polygons preserved).`
       : `Effective operational mode: ${effectiveMode || "unassigned"}.`;
     $("reviewer").value = item.reviewer_identifier; $("notes").value = item.investigator_notes;

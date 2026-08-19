@@ -27,7 +27,10 @@ from chickpea_ssl.field2_blind_review import (
     atomic_write_json, require_main_sampling_frame, validate_annotation_display_contract,
     verify_preview_hashes,
 )
-from chickpea_ssl.field2_area_review import ALLEY_POINT_LABELS, require_frozen_area_contract
+from chickpea_ssl.field2_area_review import (
+    ALLEY_POINT_LABELS, OUTSIDE_FIELD_POINT_LABELS, require_frozen_area_contract,
+)
+from chickpea_ssl.field2_point_spectra import PredictionFreeSpectrumStore
 from chickpea_ssl.field2_readiness import sha256
 
 
@@ -38,6 +41,8 @@ ANNOTATION_COLUMNS = [
     "annotation_display_version", "annotation_display_contract_sha256",
     "natural_rgb_preview_sha256", "requires_visual_rereview",
     "area_zone_contract_sha256", "zone_type", "domain", "boundary_needs_correction",
+    "domain_code", "domain_name", "raw_polygon_memberships", "precedence_applied",
+    "domain_reporting_stratum",
 ]
 
 
@@ -64,6 +69,8 @@ def default_annotation(
         "natural_rgb_preview_sha256": natural_rgb_hash,
         "requires_visual_rereview": False,
         "area_zone_contract_sha256": "", "zone_type": "", "domain": "",
+        "domain_code": 0, "domain_name": "", "raw_polygon_memberships": "",
+        "precedence_applied": False, "domain_reporting_stratum": "",
         "boundary_needs_correction": False,
     }
 
@@ -175,6 +182,11 @@ class PointAnnotationStore:
             record["area_zone_contract_sha256"] = self.area_contract_hash
             record["zone_type"] = str(getattr(row, "zone_type", ""))
             record["domain"] = str(getattr(row, "domain", ""))
+            record["domain_code"] = int(getattr(row, "domain_code", 0))
+            record["domain_name"] = str(getattr(row, "domain_name", ""))
+            record["raw_polygon_memberships"] = str(getattr(row, "raw_polygon_memberships", ""))
+            record["precedence_applied"] = bool(getattr(row, "precedence_applied", False))
+            record["domain_reporting_stratum"] = str(getattr(row, "domain_reporting_stratum", ""))
             record["boundary_needs_correction"] = bool(record.get("boundary_needs_correction", False))
         return migrated
 
@@ -224,10 +236,19 @@ class PointAnnotationStore:
             expected_zone = str(getattr(row, "zone_type", "")); expected_domain = str(getattr(row, "domain", ""))
             if record.get("area_zone_contract_sha256", "") != self.area_contract_hash: item_issues.append("area_zone_contract_hash_mismatch")
             if record.get("zone_type", "") != expected_zone or record.get("domain", "") != expected_domain: item_issues.append("frozen_zone_membership_mismatch")
+            for key, expected_value in (
+                ("domain_code", int(getattr(row, "domain_code", 0))),
+                ("domain_name", str(getattr(row, "domain_name", ""))),
+                ("raw_polygon_memberships", str(getattr(row, "raw_polygon_memberships", ""))),
+                ("precedence_applied", bool(getattr(row, "precedence_applied", False))),
+                ("domain_reporting_stratum", str(getattr(row, "domain_reporting_stratum", ""))),
+            ):
+                if record.get(key) != expected_value: item_issues.append(f"frozen_{key}_mismatch")
             if not isinstance(record.get("boundary_needs_correction"), bool): item_issues.append("boundary_needs_correction_must_be_boolean")
             if record.get("boundary_needs_correction") and label: item_issues.append("boundary_correction_must_not_force_label")
             if record.get("boundary_needs_correction") and reviewed: item_issues.append("boundary_correction_cannot_be_reviewed")
-            if expected_zone == "alley" and label and label not in ALLEY_POINT_LABELS: item_issues.append("label_not_allowed_in_alley")
+            if expected_zone in {"alley", "outside_research_field"} and label and label not in ALLEY_POINT_LABELS:
+                item_issues.append("label_not_allowed_in_non_chickpea_domain")
             if not isinstance(record.get("requires_visual_rereview"), bool): item_issues.append("requires_visual_rereview_must_be_boolean")
             expected_previews = json.loads(str(row.source_preview_checksums))
             if record.get("source_preview_checksums") != expected_previews: item_issues.append("source_preview_checksums_mismatch")
@@ -323,27 +344,27 @@ HTML = r'''<!doctype html>
 :root{color-scheme:dark;font-family:system-ui,sans-serif}*{box-sizing:border-box}
 body{margin:0;background:#101418;color:#edf2f7;overflow:hidden}header{padding:7px 10px;background:#182028;border-bottom:1px solid #3f4b56}.bar,.button-group{display:flex;flex-wrap:wrap;gap:6px;align-items:center}button,select,input,textarea{font:inherit;color:inherit;background:#26313b;border:1px solid #52606d;border-radius:5px;padding:6px}
 button{cursor:pointer}.primary{background:#18794e}.danger{background:#7f1d1d}.active{outline:2px solid #67e8f9;outline-offset:1px}
-.layout{display:grid;grid-template-columns:minmax(420px,1.05fr) minmax(350px,.85fr) 390px;height:calc(100vh - 80px);min-height:0}.column{min-width:0;min-height:0;padding:8px;background:#050708;overflow:auto}.center{display:grid;grid-template-rows:auto 1fr 1fr;gap:7px;border-left:1px solid #26313b}
+.layout{display:grid;grid-template-columns:minmax(420px,1.05fr) minmax(350px,.85fr) 410px;height:calc(100vh - 80px);min-height:0}.column{min-width:0;min-height:0;padding:8px;background:#050708;overflow:auto}.center{display:grid;grid-template-rows:auto minmax(210px,1fr) minmax(180px,.8fr) minmax(210px,.75fr);gap:7px;border-left:1px solid #26313b}
 .panel{display:flex;min-width:0;min-height:0;flex-direction:column;align-items:center;justify-content:center;gap:5px}.panel-title{font-size:.82rem;color:#b9c4ce}canvas{display:block;max-width:100%;max-height:100%;border:1px solid #52606d;background:#000;touch-action:none;position:relative;z-index:1}.viewer{width:100%;height:auto;cursor:crosshair;image-rendering:pixelated}.viewer.dragging{cursor:grabbing}.magnifier{width:min(100%,500px);height:auto;image-rendering:pixelated}
 .legend{display:flex;gap:16px;font-size:.8rem}.yellow{color:#ffd166}.cyan{color:#67e8f9}.form{height:calc(100vh - 80px);padding:9px;overflow:auto;background:#151b21;position:sticky;top:0;z-index:20;border-left:1px solid #3f4b56}.field{display:block;margin:6px 0}.field span{display:block;color:#b9c4ce;font-size:.8rem}.form textarea,.form input,.form select{width:100%}
-.choice{min-width:110px;min-height:42px;flex:1 1 45%;text-transform:capitalize;font-weight:650}.choice[aria-pressed=true]{background:#075985;border-color:#67e8f9}.choice:disabled{opacity:.35;cursor:not-allowed}.confidence-choice{min-height:36px}.confidence-choice[aria-pressed=true]{background:#166534}.message{margin:5px 0;color:#ffd166;font-weight:600}#status{padding-top:4px}.dirty,.warning{color:#ffd166}.rereview{color:#ff9f1c}.help{font-size:.75rem;color:#b9c4ce}.metadata{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:.75rem}.zone{padding:7px;background:#1e293b;border-left:4px solid #67e8f9}.form-actions{position:sticky;bottom:0;background:#151b21;padding:7px 0;border-top:1px solid #3f4b56}.controls-shield{pointer-events:none;position:absolute;inset:0;z-index:-1}.hidden{display:none!important}
+.choice{min-width:110px;min-height:42px;flex:1 1 45%;text-transform:capitalize;font-weight:650}.choice[aria-pressed=true]{background:#075985;border-color:#67e8f9}.choice:disabled{opacity:.35;cursor:not-allowed}.confidence-choice{min-height:36px}.confidence-choice[aria-pressed=true]{background:#166534}.message{margin:5px 0;color:#ffd166;font-weight:600}#status{padding-top:4px}.dirty,.warning{color:#ffd166}.rereview{color:#ff9f1c}.help{font-size:.75rem;color:#b9c4ce}.metadata{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:.75rem}.zone{padding:7px;background:#1e293b;border-left:4px solid #67e8f9}.label-panel{position:sticky;top:-9px;background:#151b21;z-index:4;padding-top:4px}.form-actions{position:sticky;bottom:0;background:#151b21;padding:7px 0;border-top:1px solid #3f4b56}.controls-shield{pointer-events:none;position:absolute;inset:0;z-index:-1}.hidden{display:none!important}#spectrum{width:100%;height:auto;background:#fff}#spectrumIndices{white-space:pre-wrap}
 @media(max-width:1200px){.layout{grid-template-columns:minmax(360px,1fr) minmax(310px,.8fr) 350px}.choice{min-width:100px}}
 </style></head><body>
 <header><div class="bar">
 <div id="status">Loading frozen MAIN frame…</div><div id="safetyMessage" class="message">Sample location is frozen; clicking only changes the inspection view.</div><div class="help">Point annotation remains gated on the frozen area contract. Image clicks never choose a biological label.</div>
 </div></header><div class="layout">
 <section class="column"><div class="panel-title">Cube overview · frozen yellow sample · cyan inspection</div><canvas id="viewer" class="viewer" width="900" height="760" aria-label="Cube overview"></canvas><div class="legend"><span class="yellow">□ Frozen sample</span><span class="cyan">＋ Inspection location</span></div></section>
-<section class="column center"><div class="bar"><label>Layer <select id="layer"><option value="natural_rgb">Natural RGB (default)</option><option value="false_colour">False color</option><option value="pca">PCA</option><option value="stored_index">Stored index</option><option value="support_outline">Support</option></select></label><button class="zoom-choice" data-zoom="2">2×</button><button class="zoom-choice" data-zoom="4">4×</button><button class="zoom-choice" data-zoom="8">8×</button><button class="zoom-choice" data-zoom="16">16×</button><button id="resetView">Reset</button><label><input id="grid" type="checkbox" checked> Grid</label><label><input id="showInspection" type="checkbox" checked> Inspection</label></div><section class="panel"><div class="panel-title">Large frozen-sample magnifier</div><canvas id="frozenMagnifier" class="magnifier" width="500" height="360"></canvas></section><section class="panel" id="inspectionPanel"><div class="panel-title">Inspection magnifier</div><canvas id="inspectionMagnifier" class="magnifier" width="500" height="300"></canvas></section></section>
-<aside class="form"><div class="controls-shield" aria-hidden="true"></div><div class="bar"><button id="prev">← Previous</button><button id="next">Next →</button><span id="counter"></span></div><label class="field"><span>Cube</span><select id="cubeFilter"></select></label><div class="bar"><label>Role <select id="roleFilter"></select></label><label>Review <select id="reviewFilter"><option value="">All</option><option value="rereview">Re-review</option></select></label></div><h3>Biological annotation</h3>
+<section class="column center"><div class="bar"><label>Layer <select id="layer"><option value="natural_rgb">Natural RGB (default)</option><option value="false_colour">False color</option><option value="pca">PCA</option><option value="stored_index">Stored index (not authoritative NDVI)</option><option value="support_outline">Support</option></select></label><button class="zoom-choice" data-zoom="2">2×</button><button class="zoom-choice" data-zoom="4">4×</button><button class="zoom-choice" data-zoom="8">8×</button><button class="zoom-choice" data-zoom="16">16×</button><button id="resetView">Reset</button><label><input id="grid" type="checkbox" checked> Grid</label><label><input id="showInspection" type="checkbox" checked> Inspection</label></div><section class="panel"><div class="panel-title">Large frozen-sample magnifier</div><canvas id="frozenMagnifier" class="magnifier" width="500" height="360"></canvas></section><section class="panel" id="inspectionPanel"><div class="panel-title">Inspection magnifier</div><canvas id="inspectionMagnifier" class="magnifier" width="500" height="300"></canvas></section><section class="panel"><div class="panel-title">Raw center spectrum · Python bands 3–113 · wavelength (nm)</div><canvas id="spectrum" width="500" height="230"></canvas><label class="help"><input id="showMedianSpectrum" type="checkbox" checked> Show valid 3×3 median</label><div id="spectrumIndices" class="help"></div></section></section>
+<aside class="form"><div class="controls-shield" aria-hidden="true"></div><div class="bar"><button id="prev">← Previous</button><button id="next">Next →</button><button id="prevUnlabeled">← Unlabeled</button><button id="nextUnlabeled">Unlabeled →</button><button id="prevCube">← Cube</button><button id="nextCube">Cube →</button></div><span id="counter"></span><div id="progressBreakdown" class="help"></div><label class="field"><span>Cube</span><select id="cubeFilter"></select></label><div class="bar"><label>Role <select id="roleFilter"></select></label><label>Review <select id="reviewFilter"><option value="">All</option><option value="rereview">Re-review</option></select></label></div><div class="label-panel"><h3>Biological annotation</h3>
 <div id="zoneMembership" class="zone">Frozen zone membership loading…</div>
 <div class="field"><span>Selected label (no default)</span><div id="labelButtons" class="button-group" role="group" aria-label="Selected label"></div></div>
-<div class="field"><span>Confidence</span><div id="confidenceButtons" class="button-group" role="group" aria-label="Confidence"></div></div>
+<div class="field"><span>Confidence</span><div id="confidenceButtons" class="button-group" role="group" aria-label="Confidence"></div></div></div>
 <label class="field"><span>Reviewer identifier (optional)</span><input id="reviewer"></label><label class="field"><span>Investigator note (optional)</span><textarea id="note"></textarea></label>
-<button id="boundaryCorrection">Boundary needs correction</button><p id="rereview" class="rereview"></p><p id="contradiction" class="warning"></p><div id="metadata" class="metadata"></div><div class="form-actions"><button id="review" class="primary">Mark reviewed</button> <button id="save" class="primary">Save all</button> <button id="clear" class="danger">Clear</button></div>
+<button id="boundaryCorrection">Boundary needs correction</button><p id="rereview" class="rereview"></p><p id="contradiction" class="warning"></p><div id="metadata" class="metadata"></div><p class="help">Alt+1…Alt+0 choose labels in displayed order; Alt+H/M/L set confidence. No label is suggested or selected automatically.</p><div class="form-actions"><button id="review" class="primary">Mark reviewed</button> <button id="save" class="primary">Save all</button> <button id="saveContinue" class="primary">Save &amp; next unlabeled</button> <button id="clear" class="danger">Clear</button></div>
 </aside></div><script src="/field2-point-viewer.js"></script></body></html>'''
 
 
-def handler_factory(store: PointAnnotationStore):
+def handler_factory(store: PointAnnotationStore, spectra: PredictionFreeSpectrumStore | None = None):
     class Handler(BaseHTTPRequestHandler):
         def send_bytes(self, content: bytes, content_type: str, status: int = 200):
             self.send_response(status); self.send_header("Content-Type", content_type); self.send_header("Content-Length", str(len(content))); self.send_header("Cache-Control", "no-store"); self.end_headers(); self.wfile.write(content)
@@ -356,7 +377,19 @@ def handler_factory(store: PointAnnotationStore):
             if clean == "/api/samples": return self.send_bytes(store.frame.to_json(orient="records").encode(), "application/json")
             if clean == "/api/manifest": return self.send_bytes(json.dumps(store.public_manifest()).encode(), "application/json")
             if clean == "/api/annotations": return self.send_bytes(json.dumps(store.load()).encode(), "application/json")
-            if clean == "/api/schema": return self.send_bytes(json.dumps({"labels": POINT_LABELS, "confidence": CONFIDENCE_VALUES, "alley_labels": ALLEY_POINT_LABELS, "frame": "main", "reserve_exposed": False, "default_layer": "natural_rgb", "display_version": store.display_version, "area_geometry_frozen": bool(store.area_contract_hash)}).encode(), "application/json")
+            if clean.startswith("/api/spectrum/"):
+                if spectra is None: return self.send_bytes(b"Spectrum service unavailable", "text/plain", 404)
+                try: return self.send_bytes(json.dumps(spectra.sample_spectrum(clean.rsplit("/", 1)[-1])).encode(), "application/json")
+                except (KeyError, ValueError) as error: return self.send_bytes(str(error).encode(), "text/plain", 404)
+            if clean == "/api/schema": return self.send_bytes(json.dumps({
+                "labels": POINT_LABELS, "confidence": CONFIDENCE_VALUES,
+                "non_chickpea_domain_labels": OUTSIDE_FIELD_POINT_LABELS,
+                "label_shortcuts": {label: str((index + 1) % 10) for index, label in enumerate(POINT_LABELS)},
+                "confidence_shortcuts": {"high": "h", "medium": "m", "low": "l"},
+                "frame": "main", "reserve_exposed": False, "default_layer": "natural_rgb",
+                "display_version": store.display_version, "area_geometry_frozen": bool(store.area_contract_hash),
+                "raw_spectrum_available": spectra is not None, "model_outputs_available": False,
+            }).encode(), "application/json")
             if clean.startswith("/layers/"):
                 parts = clean.strip("/").split("/")
                 if len(parts) == 3 and parts[2].endswith(".png"):
@@ -383,10 +416,15 @@ def main() -> None:
     area_config = yaml.safe_load(args.area_config.read_text())
     area_contract, area_membership = require_frozen_area_contract(project, area_config)
     main_frame = released["main"].merge(
-        area_membership[["sample_id", "zone_type", "domain", "primary_external_validation_eligible"]],
+        area_membership[[
+            "sample_id", "domain_code", "domain_name", "raw_polygon_memberships", "precedence_applied",
+            "domain_reporting_stratum", "primary_external_validation_eligible",
+        ]],
         on="sample_id", how="left", validate="one_to_one",
     )
-    if main_frame[["zone_type", "domain"]].eq("").any().any() or main_frame[["zone_type", "domain"]].isna().any().any():
+    main_frame["zone_type"] = main_frame["domain_name"]
+    main_frame["domain"] = main_frame["domain_reporting_stratum"]
+    if main_frame[["domain_name", "domain"]].eq("").any().any() or main_frame[["domain_name", "domain"]].isna().any().any():
         raise ValueError("Frozen area membership is incomplete for the 800-point main frame")
     display_contract_path = project / config["annotation_display"]["display_contract"]
     display_result = validate_annotation_display_contract(project, config, display_contract_path)
@@ -396,8 +434,12 @@ def main() -> None:
         config["annotation_display"]["version"], sha256(display_contract_path),
         project / config["point_annotation"]["output_root"], sha256(project / area_config["freeze"]["contract"]),
     )
+    spectra = PredictionFreeSpectrumStore(
+        project, project / config["inputs"]["readiness_inventory"],
+        project / config["inputs"]["valid_support_manifest"], main_frame,
+    )
     current, rereview_count = store.migrate_display_version(store.load())
-    port = args.port or int(config["point_annotation"]["port"]); server = ThreadingHTTPServer(("127.0.0.1", port), handler_factory(store)); url = f"http://127.0.0.1:{port}"
+    port = args.port or int(config["point_annotation"]["port"]); server = ThreadingHTTPServer(("127.0.0.1", port), handler_factory(store, spectra)); url = f"http://127.0.0.1:{port}"
     reviewed_count = sum(record["reviewed"] for record in current["annotations"].values())
     print(f"Field 2 prediction-free MAIN point annotator: {url}", flush=True); print("Default layer: full-resolution natural RGB", flush=True); print("Reserve frame: locked and not served", flush=True); print(f"Reviewed records: {reviewed_count}; requiring RGB visual re-review: {rereview_count}", flush=True); print(f"Resume file: {store.json_path}", flush=True)
     if not args.no_browser: threading.Timer(.5, lambda: webbrowser.open(url)).start()

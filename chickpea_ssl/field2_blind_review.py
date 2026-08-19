@@ -53,6 +53,7 @@ POINT_LABELS = (
     "chickpea",
     "ordinary_weed",
     "tall_grass_weed",
+    "other_weed",
     "soil",
     "chickpea_soil_mixed",
     "chickpea_weed_mixed",

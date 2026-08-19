@@ -81,6 +81,8 @@
   const frozenCtx = frozenMagnifier.getContext("2d");
   const inspectionMagnifier = $("inspectionMagnifier");
   const inspectionCtx = inspectionMagnifier.getContext("2d");
+  const spectrumCanvas = $("spectrum");
+  const spectrumCtx = spectrumCanvas.getContext("2d");
   let samples = [];
   let visible = [];
   let manifest = {};
@@ -93,6 +95,8 @@
   let drag = null;
   let selectedLabel = "";
   let selectedConfidence = "";
+  let spectrumCache = new Map();
+  let currentSpectrum = null;
 
   function currentSample() { return visible[sampleIndex]; }
   function currentRecord() { return annotations.annotations[currentSample().sample_id]; }
@@ -216,6 +220,43 @@
   function chooseButtons(containerId, selected) {
     for (const button of $(containerId).querySelectorAll("button")) button.setAttribute("aria-pressed", String(button.dataset.value === selected));
   }
+  function drawSpectrum() {
+    const ctx = spectrumCtx, canvas = spectrumCanvas;
+    ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (!currentSpectrum) { ctx.fillStyle = "#111"; ctx.fillText("Loading raw reflectance…", 20, 30); return; }
+    const wavelengths = currentSpectrum.wavelengths_nm;
+    const center = currentSpectrum.center_reflectance;
+    const series = [center];
+    if ($("showMedianSpectrum").checked) series.push(currentSpectrum.valid_3x3_median_reflectance);
+    const finite = series.flat().filter(Number.isFinite);
+    const low = Math.min(...finite), high = Math.max(...finite), spread = Math.max(1e-9, high - low);
+    const left = 48, right = canvas.width - 12, top = 12, bottom = canvas.height - 32;
+    const x = (index) => left + index * (right - left) / (wavelengths.length - 1);
+    const y = (value) => bottom - (value - low) * (bottom - top) / spread;
+    ctx.strokeStyle = "#555"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(left, top); ctx.lineTo(left, bottom); ctx.lineTo(right, bottom); ctx.stroke();
+    [[center, "#075985"], [currentSpectrum.valid_3x3_median_reflectance, "#d97706"]].forEach(([values, color], index) => {
+      if (index && !$("showMedianSpectrum").checked) return;
+      ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.beginPath();
+      values.forEach((value, position) => { if (position === 0) ctx.moveTo(x(position), y(value)); else ctx.lineTo(x(position), y(value)); }); ctx.stroke();
+    });
+    ctx.fillStyle = "#111"; ctx.font = "11px system-ui";
+    ctx.fillText(`${wavelengths[0].toFixed(1)} nm`, left, canvas.height - 10);
+    ctx.fillText(`${wavelengths[wavelengths.length - 1].toFixed(1)} nm`, right - 48, canvas.height - 10);
+    ctx.fillText(`center`, left + 75, 18); ctx.fillStyle = "#d97706"; ctx.fillText(`valid 3×3 median`, left + 125, 18);
+    $("spectrumIndices").textContent = Object.entries(currentSpectrum.raw_band_indices).map(([name, item]) => `${name} = ${item.value === null ? "undefined" : item.value.toFixed(5)} · ${item.formula} · no threshold`).join("\n") + "\nStored scalar layer is not authoritative NDVI. No model output is displayed.";
+  }
+  async function loadSpectrum() {
+    const sampleId = currentSample().sample_id;
+    currentSpectrum = spectrumCache.get(sampleId) || null; drawSpectrum();
+    if (!currentSpectrum) {
+      const response = await fetch(`/api/spectrum/${encodeURIComponent(sampleId)}`);
+      if (!response.ok) return setStatus(await response.text(), true);
+      const item = await response.json();
+      if (item.model_prediction_probability_or_threshold_used) throw new Error("Spectrum endpoint is not prediction-free");
+      spectrumCache.set(sampleId, item);
+      if (currentSample().sample_id === sampleId) { currentSpectrum = item; drawSpectrum(); }
+    }
+  }
   function renderForm() {
     const sample = currentSample();
     const record = currentRecord();
@@ -223,13 +264,13 @@
     selectedConfidence = record.confidence;
     chooseButtons("labelButtons", selectedLabel);
     chooseButtons("confidenceButtons", selectedConfidence);
-    const alley = sample.zone_type === "alley";
-    const allowed = new Set(alley ? schema.alley_labels : schema.labels);
+    const restricted = ["alley", "outside_research_field"].includes(sample.domain_name);
+    const allowed = new Set(restricted ? schema.non_chickpea_domain_labels : schema.labels);
     for (const button of $("labelButtons").querySelectorAll("button")) {
       button.disabled = !allowed.has(button.dataset.value);
-      button.title = button.disabled ? "This biological label is unavailable for an investigator-confirmed alley point." : "";
+      button.title = button.disabled ? "Chickpea labels are unavailable in this frozen non-chickpea domain; use boundary needs correction if needed." : `Alt+${schema.label_shortcuts[button.dataset.value]}`;
     }
-    $("zoneMembership").textContent = `Frozen zone: ${sample.zone_type.replaceAll("_", " ")} · domain: ${sample.domain.replaceAll("_", " ")}${sample.primary_external_validation_eligible ? " · primary external validation" : " · reported separately/supplementary"}`;
+    $("zoneMembership").textContent = `Frozen domain ${sample.domain_code}: ${sample.domain_name.replaceAll("_", " ")} · ${sample.domain_reporting_stratum.replaceAll("_", " ")} · raw polygon memberships: ${sample.raw_polygon_memberships || "none"} · precedence applied: ${sample.precedence_applied}`;
     $("boundaryCorrection").setAttribute("aria-pressed", String(record.boundary_needs_correction));
     $("boundaryCorrection").classList.toggle("active", record.boundary_needs_correction);
     $("reviewer").value = record.reviewer_identifier;
@@ -239,10 +280,14 @@
     $("contradiction").textContent = record.role_contradiction ? "ROLE CONTRADICTION RECORDED: investigator selected chickpea on a frozen absent-negative-control cube." : "";
     const item = manifest[sample.cube_id];
     const wavelengths = item.natural_rgb_wavelengths_nm;
-    $("metadata").textContent = `sample ID: ${sample.sample_id}\ncube ID: ${sample.cube_id}\nfrozen row, column: ${sample.row}, ${sample.column}\ninspection row, column: ${viewerState.inspection.row}, ${viewerState.inspection.column}\nfrozen cube role: ${sample.cube_evaluation_role}\nzone: ${sample.zone_type}\ndomain: ${sample.domain}\nRGB wavelengths: ${wavelengths.red} / ${wavelengths.green} / ${wavelengths.blue} nm\ndisplay version: ${record.annotation_display_version}\nframe: MAIN only`;
+    $("metadata").textContent = `sample ID: ${sample.sample_id}\ncube ID: ${sample.cube_id}\nfrozen row, column: ${sample.row}, ${sample.column}\ninspection row, column: ${viewerState.inspection.row}, ${viewerState.inspection.column}\nfrozen cube role: ${sample.cube_evaluation_role}\ninvestigator cube notes: ${sample.cube_investigator_notes || "(none)"}\ndomain: ${sample.domain_name} (${sample.domain_reporting_stratum})\nRGB wavelengths: ${wavelengths.red} / ${wavelengths.green} / ${wavelengths.blue} nm\ndisplay version: ${record.annotation_display_version}\nframe: MAIN only · reserve unavailable`;
     const reviewed = Object.values(annotations.annotations).filter((item) => item.reviewed).length;
     const rereview = Object.values(annotations.annotations).filter((item) => item.requires_visual_rereview).length;
     $("counter").textContent = `${sampleIndex + 1} / ${visible.length} filtered · ${reviewed}/800 reviewed · ${rereview} re-review`;
+    const cubeRecords = samples.filter((item) => item.cube_id === sample.cube_id).map((item) => annotations.annotations[item.sample_id]);
+    const domainRecords = samples.filter((item) => item.domain_name === sample.domain_name).map((item) => annotations.annotations[item.sample_id]);
+    const classCounts = Object.values(annotations.annotations).reduce((counts, item) => { if (item.selected_label) counts[item.selected_label] = (counts[item.selected_label] || 0) + 1; return counts; }, {});
+    $("progressBreakdown").textContent = `Cube ${sample.cube_id}: ${cubeRecords.filter((item) => item.reviewed).length}/${cubeRecords.length} reviewed · Domain ${sample.domain_name}: ${domainRecords.filter((item) => item.reviewed).length}/${domainRecords.length} · Class totals: ${Object.entries(classCounts).map(([name, count]) => `${name}=${count}`).join(", ") || "none"}`;
     setStatus(`${sample.sample_id} · ${record.reviewed ? "REVIEWED" : "not reviewed"}${record.requires_visual_rereview ? " · RE-REVIEW REQUIRED" : ""} · ${record.selected_label || "unlabeled"}${dirty ? " · UNSAVED" : ""}`, dirty);
     for (const button of document.querySelectorAll(".zoom-choice")) button.classList.toggle("active", Number(button.dataset.zoom) === viewerState.zoom);
   }
@@ -257,6 +302,7 @@
     image.onload = render;
     image.onerror = () => setStatus("Prediction-free display layer failed to load.", true);
     image.src = `/layers/${sample.cube_id}/${viewerState.layer}.png?v=${Date.now()}`;
+    if (resetSample) loadSpectrum().catch((error) => setStatus(String(error), true));
   }
   function filterSamples() {
     const cube = $("cubeFilter").value;
@@ -273,6 +319,14 @@
     sampleIndex = Math.max(0, Math.min(visible.length - 1, sampleIndex + delta));
     loadImage(true);
   }
+  function moveMatching(direction, predicate) {
+    for (let offset = 1; offset <= visible.length; offset += 1) {
+      const candidate = sampleIndex + direction * offset;
+      if (candidate < 0 || candidate >= visible.length) break;
+      if (predicate(visible[candidate], visible[sampleIndex])) { sampleIndex = candidate; loadImage(true); return; }
+    }
+    setStatus("No matching MAIN sample in that direction.", true);
+  }
   function updateAnnotation() {
     const sample = currentSample();
     const record = currentRecord();
@@ -287,17 +341,25 @@
     renderForm();
   }
   function setChoice(field, value) {
-    if (field === "selected_label") selectedLabel = selectedLabel === value ? "" : value;
+    if (field === "selected_label") {
+      const sample = currentSample();
+      const restricted = ["alley", "outside_research_field"].includes(sample.domain_name);
+      if (restricted && !schema.non_chickpea_domain_labels.includes(value)) {
+        return setStatus("Chickpea labels are prohibited in this frozen domain. Use Boundary needs correction if the boundary is wrong.", true);
+      }
+      selectedLabel = selectedLabel === value ? "" : value;
+    }
     else selectedConfidence = selectedConfidence === value ? "" : value;
     updateAnnotation();
   }
   async function save() {
     const response = await fetch("/api/annotations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(annotations) });
-    if (!response.ok) return setStatus(await response.text(), true);
+    if (!response.ok) { setStatus(await response.text(), true); return false; }
     const result = await response.json();
     annotations.revision = result.revision;
     dirty = false;
     setStatus(`SAVED: ${result.records} MAIN records · ${result.reviewed} reviewed. File: ${result.file}`);
+    return true;
   }
   function eventPosition(event, canvas) {
     const rect = canvas.getBoundingClientRect();
@@ -354,13 +416,13 @@
   function buildChoices() {
     for (const value of schema.labels) {
       const button = document.createElement("button");
-      button.type = "button"; button.className = "choice label-choice"; button.dataset.value = value; button.textContent = value.replaceAll("_", " "); button.setAttribute("aria-pressed", "false");
+      button.type = "button"; button.className = "choice label-choice"; button.dataset.value = value; button.textContent = `${value.replaceAll("_", " ")} [Alt+${schema.label_shortcuts[value]}]`; button.setAttribute("aria-pressed", "false");
       button.addEventListener("click", () => setChoice("selected_label", value));
       $("labelButtons").appendChild(button);
     }
     for (const value of schema.confidence) {
       const button = document.createElement("button");
-      button.type = "button"; button.className = "choice confidence-choice"; button.dataset.value = value; button.textContent = value; button.setAttribute("aria-pressed", "false");
+      button.type = "button"; button.className = "choice confidence-choice"; button.dataset.value = value; button.textContent = `${value} [Alt+${schema.confidence_shortcuts[value].toUpperCase()}]`; button.setAttribute("aria-pressed", "false");
       button.addEventListener("click", () => setChoice("confidence", value));
       $("confidenceButtons").appendChild(button);
     }
@@ -368,12 +430,17 @@
   function bindControls() {
     $("prev").addEventListener("click", () => move(-1));
     $("next").addEventListener("click", () => move(1));
+    $("prevUnlabeled").addEventListener("click", () => moveMatching(-1, (sample) => !annotations.annotations[sample.sample_id].selected_label));
+    $("nextUnlabeled").addEventListener("click", () => moveMatching(1, (sample) => !annotations.annotations[sample.sample_id].selected_label));
+    $("prevCube").addEventListener("click", () => moveMatching(-1, (sample, current) => sample.cube_id !== current.cube_id));
+    $("nextCube").addEventListener("click", () => moveMatching(1, (sample, current) => sample.cube_id !== current.cube_id));
     for (const id of ["cubeFilter", "roleFilter", "reviewFilter"]) $(id).addEventListener("change", filterSamples);
     $("layer").addEventListener("change", () => loadImage(false));
     for (const button of document.querySelectorAll(".zoom-choice")) button.addEventListener("click", () => { viewerState = setZoom(viewerState, Number(button.dataset.zoom)); render(); });
     $("resetView").addEventListener("click", () => { viewerState = reset(viewerState); render(); });
     $("grid").addEventListener("change", renderCanvases);
     $("showInspection").addEventListener("change", () => { $("inspectionPanel").classList.toggle("hidden", !$("showInspection").checked); renderCanvases(); });
+    $("showMedianSpectrum").addEventListener("change", drawSpectrum);
     $("reviewer").addEventListener("change", updateAnnotation);
     $("note").addEventListener("change", updateAnnotation);
     $("boundaryCorrection").addEventListener("click", () => {
@@ -392,13 +459,20 @@
     $("clear").addEventListener("click", () => {
       if (!confirm("Clear this MAIN annotation?")) return;
       const sample = currentSample(); const old = currentRecord();
-      annotations.annotations[sample.sample_id] = { sample_id: sample.sample_id, cube_id: sample.cube_id, frozen_cube_role: sample.cube_evaluation_role, selected_label: "", confidence: "", investigator_note: "", reviewed: false, review_timestamp: "", reviewer_identifier: "", role_contradiction: false, source_preview_checksums: JSON.parse(sample.source_preview_checksums), sampling_frame_sha256: annotations.sampling_frame_sha256, annotation_display_version: annotations.annotation_display_version, annotation_display_contract_sha256: annotations.annotation_display_contract_sha256, natural_rgb_preview_sha256: old.natural_rgb_preview_sha256, requires_visual_rereview: false, area_zone_contract_sha256: old.area_zone_contract_sha256, zone_type: old.zone_type, domain: old.domain, boundary_needs_correction: false };
+      annotations.annotations[sample.sample_id] = { ...old, selected_label: "", confidence: "", investigator_note: "", reviewed: false, review_timestamp: "", reviewer_identifier: "", role_contradiction: false, requires_visual_rereview: false, boundary_needs_correction: false };
       setDirty(); render();
     });
     $("save").addEventListener("click", save);
+    $("saveContinue").addEventListener("click", async () => { if (await save()) moveMatching(1, (sample) => !annotations.annotations[sample.sample_id].selected_label); });
     document.addEventListener("keydown", (event) => {
       if (["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName) && !(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
+      if (event.altKey) {
+        const label = Object.entries(schema.label_shortcuts).find(([, shortcut]) => shortcut === key);
+        const confidence = Object.entries(schema.confidence_shortcuts).find(([, shortcut]) => shortcut === key);
+        if (label) { event.preventDefault(); setChoice("selected_label", label[0]); return; }
+        if (confidence) { event.preventDefault(); setChoice("confidence", confidence[0]); return; }
+      }
       if (event.key === "ArrowLeft") move(-1); else if (event.key === "ArrowRight") move(1);
       else if ({ n: "natural_rgb", f: "false_colour", p: "pca", i: "stored_index", b: "support_outline" }[key]) { $("layer").value = { n: "natural_rgb", f: "false_colour", p: "pca", i: "stored_index", b: "support_outline" }[key]; loadImage(false); }
       else if (["2", "4", "8"].includes(key)) { viewerState = setZoom(viewerState, Number(key)); render(); }
@@ -415,7 +489,8 @@
       fetch("/api/schema").then((response) => response.json()), fetch("/api/annotations").then((response) => response.json()),
     ]);
     if (samples.length !== 800 || new Set(samples.map((item) => item.sampling_frame)).size !== 1 || samples[0].sampling_frame !== "main" || schema.reserve_exposed) throw new Error("Expected exact frozen 800-point MAIN frame with reserve locked");
-    if (!schema.area_geometry_frozen || !samples.every((item) => item.zone_type && item.domain)) throw new Error("Frozen area-zone membership is required before point annotation");
+    if (!schema.area_geometry_frozen || !samples.every((item) => item.domain_code && item.domain_name && item.domain_reporting_stratum)) throw new Error("Frozen area-domain membership is required before point annotation");
+    if (!schema.raw_spectrum_available || schema.model_outputs_available) throw new Error("Expected prediction-free raw spectrum service only");
     if (schema.default_layer !== "natural_rgb" || schema.display_version !== annotations.annotation_display_version) throw new Error("Natural RGB display provenance mismatch");
     buildChoices(); bindControls(); bindViewerEvents();
     for (const value of ["", ...new Set(samples.map((item) => item.cube_id))]) { const option = document.createElement("option"); option.value = value; option.textContent = value || "All cubes"; $("cubeFilter").appendChild(option); }

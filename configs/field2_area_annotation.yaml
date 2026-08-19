@@ -4,6 +4,15 @@ expected_cube_count: 40
 port: 8774
 
 inputs:
+  field1_benchmark_contract:
+    path: metadata/local/contracts/supervised_finalization_v1/field1_confident_supervised_benchmark_contract.yaml
+    sha256: dcef1413537e83d18afe0ed94e2d3bb3fb625cda1eb49b6069b3145ae2eee4d1
+  source_inventory_contract:
+    path: metadata/local/contracts/field2_georectified_inventory_contract.yaml
+    sha256: 21c18f07ea92cc989cdc32b580b6a450669463e42183efe1b3ce326aebf9cd1e
+  valid_support_contract:
+    path: metadata/local/contracts/field2_valid_support_contract.yaml
+    sha256: 23ea7a573c1b0de0856515f632e6d996fb3ce221001d4c887ba8b5049ee003ba
   review_manifest:
     path: metadata/local/reports/field2_cube_role_review/field2_cube_role_review_manifest.csv
     sha256: 81de7834c1e3f538a5b1b19f905dbda36521baab5a14e84da261678a4fdceaf2
@@ -53,7 +62,7 @@ operational_geometry:
     - uncertain_boundary
     - alley
     - outside_research_field
-  precedence_rule: outside_research_field>alley>uncertain_boundary>research_crop_area
+  precedence_rule: outside_research_field>alley>uncertain_boundary>research_crop_area>unassigned_valid_support
   overlap_policy: warning_and_deterministic_precedence
   blank_mode_with_polygons: mixed_manual_boundaries
   biological_labels_assigned: false
@@ -65,6 +74,11 @@ freeze:
   reserve_membership_locked: field2_area_zone_membership_reserve_locked.csv
   counts: field2_area_zone_counts.csv
   precedence_summary: field2_area_precedence_summary.csv
+  mask_manifest: field2_area_domain_mask_manifest.csv
+  domain_pixel_totals: field2_area_domain_pixel_totals.csv
+  effective_mode_reconciliation: field2_area_effective_mode_reconciliation.csv
+  geometry_repair_audit: field2_area_operational_geometry_audit.csv
+  operational_geometry: field2_area_operational_geometry.geojson
   mask_root: masks
   raw_membership_mask_root: raw_membership_masks
   expected_reviewed_cubes: 40

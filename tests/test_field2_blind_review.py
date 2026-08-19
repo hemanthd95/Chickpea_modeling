@@ -43,6 +43,7 @@ from chickpea_ssl.field2_blind_review import (
     verify_preview_hashes,
 )
 from chickpea_ssl.field2_readiness import sha256
+from chickpea_ssl.field2_point_spectra import PredictionFreeSpectrumStore, normalized_difference
 from scripts.build_field2_blind_annotation_sampling_frame import collapsed_cube_candidates
 from scripts.run_field2_point_annotator import HTML, PointAnnotationStore
 
@@ -532,7 +533,7 @@ def test_future_point_labels_preserve_tall_grass():
         "sensitivity_only", "exclude_with_reason", "unreviewed",
     }
     assert set(POINT_LABELS) == {
-        "chickpea", "ordinary_weed", "tall_grass_weed", "soil",
+        "chickpea", "ordinary_weed", "tall_grass_weed", "other_weed", "soil",
         "chickpea_soil_mixed", "chickpea_weed_mixed", "weed_soil_mixed",
         "uncertain", "nodata_invalid",
     }
@@ -625,7 +626,8 @@ def test_point_viewer_exposes_required_controls_and_nonblocking_overlay_contract
     for element_id in (
         "viewer", "frozenMagnifier", "inspectionMagnifier", "resetView", "layer",
         "prev", "next", "save", "review", "reviewer", "note", "labelButtons",
-        "confidenceButtons",
+        "confidenceButtons", "prevUnlabeled", "nextUnlabeled", "prevCube", "nextCube",
+        "saveContinue", "spectrum", "showMedianSpectrum", "progressBreakdown",
     ):
         assert f'id="{element_id}"' in HTML
     for layer in ("natural_rgb", "false_colour", "pca", "stored_index", "support_outline"):
@@ -639,9 +641,25 @@ def test_point_viewer_exposes_required_controls_and_nonblocking_overlay_contract
     assert 'button.addEventListener("click", () => setChoice' in viewer_js
     assert '$("save").addEventListener("click", save)' in viewer_js
     assert '$("review").addEventListener("click"' in viewer_js
+    assert 'fetch(`/api/spectrum/${encodeURIComponent(sampleId)}`)' in viewer_js
+    assert "schema.label_shortcuts" in viewer_js and "schema.confidence_shortcuts" in viewer_js
+    assert "Stored scalar layer is not authoritative NDVI" in viewer_js
 
 
-def test_point_schema_adds_weed_soil_mixed_and_enforces_alley_labels_and_boundary_workflow(tmp_path):
+def test_raw_band_indices_are_display_only_with_exact_wavelength_formulas_and_no_thresholds():
+    wavelengths = np.linspace(500.0, 850.0, 111)
+    values = np.linspace(10.0, 120.0, 111)
+    indices = PredictionFreeSpectrumStore._indices(values, wavelengths)
+    assert set(indices) == {"NDVI", "GNDVI", "NDRE"}
+    assert normalized_difference(8, 2) == 0.6
+    assert normalized_difference(1, -1) is None
+    for item in indices.values():
+        assert item["threshold_applied"] is False
+        assert item["formula"].startswith("(R") and " / (R" in item["formula"]
+        assert len(item["selected_wavelengths_nm"]) == 2
+
+
+def test_point_schema_adds_other_weed_and_enforces_non_chickpea_domains_and_boundary_workflow(tmp_path):
     manifest_path = make_review_manifest(tmp_path)
     frame = make_main_annotation_frame(manifest_path)
     frame["zone_type"] = "alley"
@@ -652,16 +670,24 @@ def test_point_schema_adds_weed_soil_mixed_and_enforces_alley_labels_and_boundar
     assert record["selected_label"] == "" and record["boundary_needs_correction"] is False
     assert record["zone_type"] == "alley" and record["area_zone_contract_sha256"] == "d" * 64
     record["selected_label"] = "chickpea"
-    assert "label_not_allowed_in_alley" in store.validate(payload)["sample-0000"]
+    assert "label_not_allowed_in_non_chickpea_domain" in store.validate(payload)["sample-0000"]
     record["selected_label"] = "weed_soil_mixed"
     record["boundary_needs_correction"] = True
     assert "boundary_correction_must_not_force_label" in store.validate(payload)["sample-0000"]
     record["selected_label"] = ""
     assert store.validate(payload)["sample-0000"] == []
+    frame["zone_type"] = "outside_research_field"
+    frame["domain"] = "outside_domain_ood"
+    outside_store = PointAnnotationStore(
+        tmp_path, frame, "b" * 64, manifest_path, make_natural_rgb_manifest(tmp_path),
+        "field2_annotation_display_natural_rgb_v1", "c" * 64, tmp_path / "outside-points", "e" * 64,
+    )
+    outside_payload = outside_store.load(); outside_payload["annotations"]["sample-0000"]["selected_label"] = "chickpea_weed_mixed"
+    assert "label_not_allowed_in_non_chickpea_domain" in outside_store.validate(outside_payload)["sample-0000"]
     viewer_js = Path("scripts/field2_point_viewer.js").read_text()
-    assert "schema.alley_labels" in viewer_js
+    assert "schema.non_chickpea_domain_labels" in viewer_js
     assert '$("boundaryCorrection")' in viewer_js
-    assert "Frozen zone:" in viewer_js
+    assert "raw polygon memberships" in viewer_js
 
 
 def test_frozen_sampling_and_annotation_display_hashes_are_still_exact():
@@ -787,6 +813,8 @@ def test_review_entrypoints_do_not_import_model_frameworks():
         Path("scripts/run_field2_point_annotator.py"),
         Path("scripts/prepare_field2_annotation_rgb.py"),
         Path("scripts/validate_field2_annotation_display.py"),
+        Path("chickpea_ssl/field2_point_spectra.py"),
+        Path("scripts/validate_field2_area_contract.py"),
     ]
     for path in paths:
         tree = ast.parse(path.read_text(), filename=str(path))

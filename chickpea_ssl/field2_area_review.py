@@ -46,19 +46,22 @@ ZONE_DEFINITIONS = {
 }
 
 ZONE_CODES = {
-    "unassigned_valid_support": 0,
+    "invalid_outside_valid_support": 0,
     "research_crop_area": 1,
     "alley": 2,
     "outside_research_field": 3,
     "uncertain_boundary": 4,
+    "unassigned_valid_support": 5,
 }
 
 CONFIDENCE_VALUES = ("high", "medium", "low")
 
 ALLEY_POINT_LABELS = (
-    "soil", "ordinary_weed", "tall_grass_weed", "weed_soil_mixed",
+    "soil", "ordinary_weed", "tall_grass_weed", "other_weed", "weed_soil_mixed",
     "uncertain", "nodata_invalid",
 )
+
+OUTSIDE_FIELD_POINT_LABELS = ALLEY_POINT_LABELS
 
 THREE_CLASS_MAPPING = {
     "chickpea": "chickpea",
@@ -595,16 +598,29 @@ def require_frozen_area_contract(project: Path, config: dict) -> tuple[dict, pd.
     contract = json.loads(contract_path.read_text()) if contract_path.suffix == ".json" else yaml.safe_load(contract_path.read_text())
     if contract.get("status") != "field2_area_zone_contract_frozen":
         raise RuntimeError("Field 2 area contract is not frozen")
-    if contract.get("biological_labels_assigned") is not False or contract.get("predictions_or_probabilities_used") is not False:
+    if contract.get("version") != "field2_area_zone_contract_v2":
+        raise RuntimeError("Unknown Field 2 area contract version")
+    if contract.get("precedence_rule") != "outside_research_field > alley > uncertain_boundary > research_crop_area > unassigned_valid_support":
+        raise RuntimeError("Field 2 area precedence changed")
+    prediction_free = contract.get("prediction_free_status", {})
+    if not prediction_free or any(prediction_free.values()):
         raise RuntimeError("Area contract violates prediction-free provenance")
+    for name, item in contract.get("raw_annotation_inputs", {}).items():
+        path = project / item["path"]
+        if not path.is_file() or sha256(path) != item["sha256"]:
+            raise RuntimeError(f"Raw frozen area input mismatch: {name}")
     for name, item in contract.get("frozen_outputs", {}).items():
         path = project / item["path"]
         if not path.is_file() or sha256(path) != item["sha256"]:
             raise RuntimeError(f"Frozen area output mismatch: {name}")
     main_item = contract["frozen_outputs"]["main_membership"]
     main = pd.read_csv(project / main_item["path"]).fillna("")
-    if len(main) != 800 or "row" in main.columns or "column" in main.columns:
+    prohibited = {"row", "column", "x", "y", "longitude", "latitude"}
+    required = {"domain_code", "domain_name", "raw_polygon_memberships", "precedence_applied", "domain_reporting_stratum"}
+    if len(main) != 800 or not prohibited.isdisjoint(main.columns) or not required.issubset(main.columns):
         raise RuntimeError("Frozen main area membership is invalid or exposes coordinates")
+    if not main.domain_code.between(1, 5).all() or not main.inside_valid_support.astype(str).str.lower().eq("true").all():
+        raise RuntimeError("Frozen main area membership is outside valid support")
     if contract.get("main_count") != 800 or contract.get("reserve_count") != 396:
         raise RuntimeError("Frozen area membership counts differ from sampling contracts")
     return contract, main

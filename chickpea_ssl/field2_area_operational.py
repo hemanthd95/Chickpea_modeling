@@ -27,7 +27,7 @@ ZONE_PRECEDENCE = (
     "alley",
     "outside_research_field",
 )
-PRECEDENCE_RULE = "outside_research_field>alley>uncertain_boundary>research_crop_area"
+PRECEDENCE_RULE = "outside_research_field>alley>uncertain_boundary>research_crop_area>unassigned_valid_support"
 RAW_ZONE_BITS = {zone: 1 << index for index, zone in enumerate(ZONE_PRECEDENCE)}
 DEFAULT_TERMINAL_DISTANCE_PIXELS = 12.0
 
@@ -37,10 +37,13 @@ class OperationalGeometryError(ValueError):
 
 
 def effective_coverage_mode(record: dict) -> str:
-    """Polygons always imply mixed operational coverage, including legacy blanks."""
+    """Preserve declarations; only polygon-bearing blank records reconcile to mixed."""
+    recorded = str(record.get("coverage_mode", ""))
+    if recorded:
+        return recorded
     if record.get("polygons"):
         return "mixed_manual_boundaries"
-    return str(record.get("coverage_mode", ""))
+    return ""
 
 
 def _component_area(component: dict) -> float:
@@ -69,8 +72,17 @@ def rasterize_operational_components(components: list[dict], shape: tuple[int, i
 
 
 def _polygonized_components(mask: np.ndarray) -> list[dict]:
+    occupied = np.argwhere(mask)
+    if not len(occupied):
+        return []
+    row_min, column_min = occupied.min(axis=0)
+    row_max, column_max = occupied.max(axis=0) + 1
+    cropped = mask[row_min:row_max, column_min:column_max]
+    crop_transform = Affine.translation(float(column_min), float(row_min))
     components = []
-    for geometry, value in shapes(mask.astype("uint8"), mask=mask, transform=Affine.identity(), connectivity=4):
+    for geometry, value in shapes(
+        cropped.astype("uint8"), mask=cropped, transform=crop_transform, connectivity=4,
+    ):
         if int(value) != 1 or geometry["type"] != "Polygon":
             continue
         rings = geometry["coordinates"]
@@ -191,20 +203,45 @@ def compile_operational_membership(
 ) -> dict:
     """Compile raw claims and a deterministic winning membership mask."""
     effective_mode = effective_coverage_mode(record)
-    raw_zone_masks = {zone: np.zeros(support.shape, dtype=bool) for zone in ZONE_PRECEDENCE}
+    polygon_zone_masks = {zone: np.zeros(support.shape, dtype=bool) for zone in ZONE_PRECEDENCE}
     polygon_audits = []
+    for polygon in record.get("polygons", []):
+        operational = operationalize_polygon(polygon, support.shape, terminal_distance_pixels)
+        pre_support_mask = rasterize_operational_components(operational["components"], support.shape)
+        support_mask = pre_support_mask & support
+        support_components = _polygonized_components(support_mask)
+        if not support_components:
+            raise OperationalGeometryError(
+                f"no_recoverable_polygonal_operational_geometry_after_support_clip:{operational['polygon_id']}"
+            )
+        pre_support_area = float(operational["operational_area_pixels2"])
+        support_area = sum(_component_area(component) for component in support_components)
+        if np.any(pre_support_mask & ~support):
+            operational["warnings"] = sorted(set([*operational["warnings"], "valid_support_clipping"]))
+        operational["pre_support_operational_area_pixels2"] = pre_support_area
+        operational["components"] = support_components
+        operational["component_count"] = len(support_components)
+        operational["operational_vertex_count"] = sum(
+            len(component["exterior_vertices_pixel"]) for component in support_components
+        )
+        operational["operational_area_pixels2"] = support_area
+        operational["absolute_area_change_pixels2"] = abs(support_area - operational["raw_area_pixels2"])
+        operational["percentage_area_change"] = (
+            100.0 * operational["absolute_area_change_pixels2"] / operational["raw_area_pixels2"]
+            if operational["raw_area_pixels2"] else 0.0
+        )
+        operational["rasterized_pixel_count"] = int(support_mask.sum())
+        polygon_zone_masks[operational["zone_type"]] |= support_mask
+        polygon_audits.append(operational)
+
+    raw_zone_masks = {zone: mask.copy() for zone, mask in polygon_zone_masks.items()}
     if effective_mode == "entire_support_research_field":
-        raw_zone_masks["research_crop_area"] = support.copy()
+        raw_zone_masks["research_crop_area"] |= support
     elif effective_mode == "entire_support_outside_research_field":
-        raw_zone_masks["outside_research_field"] = support.copy()
+        raw_zone_masks["outside_research_field"] |= support
     elif effective_mode == "uncertain_requires_review":
-        raw_zone_masks["uncertain_boundary"] = support.copy()
+        raw_zone_masks["uncertain_boundary"] |= support
     elif effective_mode == "mixed_manual_boundaries":
-        for polygon in record.get("polygons", []):
-            operational = operationalize_polygon(polygon, support.shape, terminal_distance_pixels)
-            mask = rasterize_operational_components(operational["components"], support.shape) & support
-            raw_zone_masks[operational["zone_type"]] |= mask
-            polygon_audits.append(operational)
         if record.get("treat_unassigned_valid_support_as_outside", False):
             claimed = np.logical_or.reduce(list(raw_zone_masks.values()))
             raw_zone_masks["outside_research_field"] |= support & ~claimed
@@ -215,19 +252,24 @@ def compile_operational_membership(
         raise OperationalGeometryError(f"missing_or_unknown_effective_coverage_mode:{effective_mode}")
 
     raw_bitmask = np.zeros(support.shape, dtype=np.uint8)
+    polygon_bitmask = np.zeros(support.shape, dtype=np.uint8)
     winning = np.zeros(support.shape, dtype=np.uint8)
+    winning[support] = ZONE_CODES["unassigned_valid_support"]
     membership_count = np.zeros(support.shape, dtype=np.uint8)
     for zone in ZONE_PRECEDENCE:
         mask = raw_zone_masks[zone] & support
+        polygon_bitmask[polygon_zone_masks[zone] & support] |= RAW_ZONE_BITS[zone]
         raw_bitmask[mask] |= RAW_ZONE_BITS[zone]
         membership_count[mask] += 1
         winning[mask] = ZONE_CODES[zone]
     winning[~support] = 0
     raw_bitmask[~support] = 0
+    polygon_bitmask[~support] = 0
     return {
         "effective_coverage_mode": effective_mode,
         "raw_zone_masks": raw_zone_masks,
         "raw_membership_bitmask": raw_bitmask,
+        "raw_polygon_membership_bitmask": polygon_bitmask,
         "winning_membership": winning,
         "precedence_applied": membership_count > 1,
         "precedence_rule": PRECEDENCE_RULE,

@@ -32,7 +32,9 @@ from chickpea_ssl.field2_area_operational import (
 )
 from chickpea_ssl.field2_blind_review import PREVIEW_LAYERS, atomic_write_bytes, natural_rgb_png_bytes
 from chickpea_ssl.field2_readiness import sha256
-from scripts.freeze_field2_area_contract import membership_rows, validate_ready_payload
+from scripts.freeze_field2_area_contract import (
+    directory_hashes, materialize_freeze_products, membership_rows, validate_ready_payload,
+)
 from scripts.build_field2_area_reconciliation import reconciliation_rows
 from scripts.build_field2_area_operational_geometry import materialize
 from scripts.run_field2_area_annotator import HTML
@@ -265,7 +267,7 @@ def test_polygons_use_effective_mixed_mode_and_geometry_warnings_do_not_block_re
     payload = store.normalize_payload(payload)
     issues = store.validate(payload)["field2_cube12"]
     assert issues == []
-    assert effective_coverage_mode(record) == "mixed_manual_boundaries"
+    assert effective_coverage_mode(record) == "entire_support_research_field"
     record = payload["annotations"]["field2_cube12"]
     record["coverage_mode"] = ""
     assert effective_coverage_mode(record) == "mixed_manual_boundaries"
@@ -432,7 +434,7 @@ def test_overlap_precedence_is_deterministic_and_records_all_raw_memberships():
     assert first["precedence_rule"] == PRECEDENCE_RULE
 
 
-def test_current_225_polygons_all_operationalize_without_changing_raw_package():
+def test_current_438_polygons_all_operationalize_without_changing_raw_package():
     source_path = Path("metadata/local/annotations/field2_area_zones/field2_area_annotations.json")
     before_bytes = source_path.read_bytes(); payload = json.loads(before_bytes)
     original = json.loads(json.dumps(payload))
@@ -449,14 +451,14 @@ def test_current_225_polygons_all_operationalize_without_changing_raw_package():
             mask = rasterize_operational_components(item["components"], shape)
             assert mask.any() and not item["operational_self_intersection"]
             count += 1
-    assert count == 225
+    assert count == 438
     assert methods == {
-        "none": 171,
-        "terminal_vertex_removed_operational_only": 53,
+        "none": 334,
+        "terminal_vertex_removed_operational_only": 103,
         "raster_polygonize_make_valid": 1,
     }
     assert payload == original and source_path.read_bytes() == before_bytes
-    assert sha256(source_path) == "7415888767d545514319cc5c175ee1b4ccc29015a4c44702775fa5ee73554b93"
+    assert sha256(source_path) == "9e45943b2b8817fdbea63e28d94aea6bcd46852cbe2750985631a39b8da560d0"
 
 
 def test_entire_support_modes_and_explicit_unassigned_handling():
@@ -471,10 +473,10 @@ def test_entire_support_modes_and_explicit_unassigned_handling():
     polygon = {"polygon_id": "a", "zone_type": "alley", "vertices_pixel": [{"x": 2, "y": 2}, {"x": 5, "y": 2}, {"x": 5, "y": 6}, {"x": 2, "y": 6}]}
     draft = {"coverage_mode": "mixed_manual_boundaries", "polygons": [polygon], "treat_unassigned_valid_support_as_outside": False}
     unassigned = compile_zone_mask(draft, support)
-    assert np.any(unassigned[support] == 0)
+    assert np.any(unassigned[support] == ZONE_CODES["unassigned_valid_support"])
     draft["treat_unassigned_valid_support_as_outside"] = True
     assigned = compile_zone_mask(draft, support)
-    assert not np.any(assigned[support] == 0)
+    assert not np.any(assigned[support] == ZONE_CODES["unassigned_valid_support"])
     assert np.any(assigned == ZONE_CODES["outside_research_field"])
 
 
@@ -483,21 +485,62 @@ def test_exact_deterministic_point_zone_membership_omits_coordinates():
     raw_bits = np.zeros((8, 10), dtype=np.uint8); raw_bits[:, :5] = 1; raw_bits[:, 5:] = 8
     compiled = {"cube": {
         "winning_membership": mask, "raw_membership_bitmask": raw_bits,
+        "raw_polygon_membership_bitmask": raw_bits,
         "precedence_applied": np.zeros((8, 10), dtype=bool),
-        "effective_coverage_mode": "mixed_manual_boundaries",
+        "effective_coverage_mode": "mixed_manual_boundaries", "raw_coverage_mode": "mixed_manual_boundaries",
     }}
     frame = pd.DataFrame([
-        {"sample_id": "one", "cube_id": "cube", "cube_evaluation_role": "primary_three_class", "row": 2, "column": 3},
-        {"sample_id": "two", "cube_id": "cube", "cube_evaluation_role": "primary_three_class", "row": 2, "column": 7},
+        {"sample_id": "one", "cube_id": "cube", "cube_evaluation_role": "primary_three_class", "row": 2, "column": 3, "scalar_index_rank_stratum": "rank_00_20", "spatial_group_id": "block-a"},
+        {"sample_id": "two", "cube_id": "cube", "cube_evaluation_role": "primary_three_class", "row": 2, "column": 7, "scalar_index_rank_stratum": "rank_20_40", "spatial_group_id": "block-b"},
     ])
     first = membership_rows(frame, compiled, "main")
     assert first == membership_rows(frame, compiled, "main")
-    assert [item["zone_type"] for item in first] == ["research_crop_area", "outside_research_field"]
+    assert [item["domain_name"] for item in first] == ["research_crop_area", "outside_research_field"]
     assert all("row" not in item and "column" not in item for item in first)
     assert first[0]["raw_zone_memberships"] == "research_crop_area"
     assert first[1]["winning_operational_membership"] == "outside_research_field"
     assert first[0]["primary_external_validation_eligible"] is True
-    assert first[1]["supplementary_or_domain_shift"] is True
+    assert first[1]["domain_reporting_stratum"] == "outside_domain_ood"
+
+
+def test_freeze_products_are_deterministic_and_explicit_all_outside_wins_preserved_alley(tmp_path):
+    store = make_area_store(tmp_path); payload = store.load()
+    for record in payload["annotations"].values():
+        record.update(coverage_mode="entire_support_research_field", confidence="high", reviewed=True,
+                      review_timestamp="2026-08-19T12:00:00+00:00")
+    payload["annotations"]["field2_cube11"].update(coverage_mode="", polygons=[{
+        "polygon_id": "blank-crop", "zone_type": "research_crop_area",
+        "vertices_pixel": [{"x": 2, "y": 1}, {"x": 8, "y": 1}, {"x": 8, "y": 7}, {"x": 2, "y": 7}],
+    }])
+    payload["annotations"]["field2_cube38"].update(
+        coverage_mode="entire_support_outside_research_field", polygons=[{
+            "polygon_id": "preserved-alley", "zone_type": "alley",
+            "vertices_pixel": [{"x": 3, "y": 2}, {"x": 7, "y": 2}, {"x": 7, "y": 6}, {"x": 3, "y": 6}],
+        }],
+    )
+    payload = store.normalize_payload(payload); validate_ready_payload(store, payload)
+    store.save(payload); payload = store.load()
+    cube_ids = store.cube_order
+    def frame(count, kind):
+        return pd.DataFrame([{
+            "sample_id": f"{kind}-{index}", "cube_id": cube_ids[index % 40],
+            "cube_evaluation_role": "primary_three_class", "row": 3, "column": 4,
+            "scalar_index_rank_stratum": "rank_00_20", "spatial_group_id": f"block-{index % 5}",
+        } for index in range(count)])
+    config = __import__("yaml").safe_load(Path("configs/field2_area_annotation.yaml").read_text())
+    first, second = tmp_path / "freeze-a", tmp_path / "freeze-b"
+    result = materialize_freeze_products(tmp_path, config, store, payload, frame(800, "main"), frame(396, "reserve"), first)
+    materialize_freeze_products(tmp_path, config, store, payload, frame(800, "main"), frame(396, "reserve"), second)
+    assert directory_hashes(first) == directory_hashes(second)
+    cube38 = result["compiled"]["field2_cube38"]
+    support = store.support_mask("field2_cube38")
+    assert np.all(cube38["winning_membership"][support] == ZONE_CODES["outside_research_field"])
+    assert np.any(cube38["raw_polygon_membership_bitmask"][support] != 0)
+    reconciled = {row["cube_id"]: row for row in result["reconciliation_rows"]}
+    assert reconciled["field2_cube11"]["effective_coverage_mode"] == "mixed_manual_boundaries"
+    assert reconciled["field2_cube11"]["reconciliation_reason"] == "reviewed_cube_with_investigator_polygons"
+    reserve = pd.read_csv(first / config["freeze"]["reserve_membership_locked"])
+    assert len(reserve) == 396 and {"row", "column", "x", "y", "longitude", "latitude"}.isdisjoint(reserve.columns)
 
 
 def test_area_ui_is_sticky_complete_and_has_no_biological_or_reserve_controls():
