@@ -1004,3 +1004,24 @@ corrections.
   provenance to the future freeze workflow without exposing reserve coordinates.
 - Made polygon-bearing blank coverage records operationally mixed while keeping
   their raw annotation fields unchanged. Freeze remains unexecuted at 3/40 review.
+
+## 2026-08-19
+
+### Completed Field 2 contextual areas frozen prediction-free
+
+- Froze revision 75 only after verifying 40/40 high-confidence reviewed cubes,
+  438 raw polygons, 2,778 immutable vertices, and byte-identical raw artifacts.
+- Materialized separate valid-support-clipped operational geometry, 40 aligned
+  domain masks, raw membership masks, deterministic overlap precedence, and
+  complete main/locked-reserve memberships without exposing reserve coordinates.
+- Reconciled the five reviewed blank-mode cubes to effective mixed boundaries,
+  while preserving explicit all-outside declarations over embedded polygons.
+- Built every operational product twice byte-identically and independently
+  recompiled the frozen contract successfully. Main memberships total 800 and
+  locked reserve memberships total 396 with zero invalid-support assignments.
+- Added the main-only raw-spectrum point interface, `other_weed`, non-chickpea
+  alley/outside restrictions, keyboard labeling, unlabeled/cube navigation, and
+  progress summaries. Point labels remain empty and unfrozen.
+- All 57 focused tests, 123 repository tests, and every frozen Field 1/Field 2
+  validator passed. No checkpoint, model, prediction, probability, threshold
+  suggestion, pseudo-label, or automatic biological label was used.
