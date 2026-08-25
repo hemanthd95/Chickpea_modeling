@@ -98,10 +98,14 @@ class PointAnnotationStore:
         display_contract_hash: str,
         output_root: Path,
         area_contract_hash: str = "",
+        allowed_labels: tuple[str, ...] = POINT_LABELS,
+        boundary_correction_exclusive: bool = True,
     ):
         self.project = project.resolve(); self.frame = main_frame.copy(); self.frame_hash = frame_hash
         self.display_version = display_version; self.display_contract_hash = display_contract_hash
         self.area_contract_hash = area_contract_hash
+        self.allowed_labels = tuple(allowed_labels)
+        self.boundary_correction_exclusive = bool(boundary_correction_exclusive)
         if set(self.frame.sampling_frame) != {"main"} or len(self.frame) != 800:
             raise ValueError("Point annotator accepts only the exact frozen 800-point main frame")
         self.sample_order = self.frame.sample_id.astype(str).tolist()
@@ -220,7 +224,7 @@ class PointAnnotationStore:
             if record.get("frozen_cube_role") != row.cube_evaluation_role:
                 item_issues.append("frozen_cube_role_mismatch")
             label, confidence, reviewed = record.get("selected_label", ""), record.get("confidence", ""), record.get("reviewed")
-            if label and label not in POINT_LABELS: item_issues.append("unknown_label")
+            if label and label not in self.allowed_labels: item_issues.append("unknown_label")
             if confidence and confidence not in CONFIDENCE_VALUES: item_issues.append("unknown_confidence")
             if not isinstance(reviewed, bool): item_issues.append("reviewed_must_be_boolean")
             if reviewed and not label: item_issues.append("reviewed_requires_label")
@@ -245,8 +249,8 @@ class PointAnnotationStore:
             ):
                 if record.get(key) != expected_value: item_issues.append(f"frozen_{key}_mismatch")
             if not isinstance(record.get("boundary_needs_correction"), bool): item_issues.append("boundary_needs_correction_must_be_boolean")
-            if record.get("boundary_needs_correction") and label: item_issues.append("boundary_correction_must_not_force_label")
-            if record.get("boundary_needs_correction") and reviewed: item_issues.append("boundary_correction_cannot_be_reviewed")
+            if self.boundary_correction_exclusive and record.get("boundary_needs_correction") and label: item_issues.append("boundary_correction_must_not_force_label")
+            if self.boundary_correction_exclusive and record.get("boundary_needs_correction") and reviewed: item_issues.append("boundary_correction_cannot_be_reviewed")
             if expected_zone in {"alley", "outside_research_field"} and label and label not in ALLEY_POINT_LABELS:
                 item_issues.append("label_not_allowed_in_non_chickpea_domain")
             if not isinstance(record.get("requires_visual_rereview"), bool): item_issues.append("requires_visual_rereview_must_be_boolean")
@@ -347,20 +351,21 @@ button{cursor:pointer}.primary{background:#18794e}.danger{background:#7f1d1d}.ac
 .layout{display:grid;grid-template-columns:minmax(420px,1.05fr) minmax(350px,.85fr) 410px;height:calc(100vh - 80px);min-height:0}.column{min-width:0;min-height:0;padding:8px;background:#050708;overflow:auto}.center{display:grid;grid-template-rows:auto minmax(210px,1fr) minmax(180px,.8fr) minmax(210px,.75fr);gap:7px;border-left:1px solid #26313b}
 .panel{display:flex;min-width:0;min-height:0;flex-direction:column;align-items:center;justify-content:center;gap:5px}.panel-title{font-size:.82rem;color:#b9c4ce}canvas{display:block;max-width:100%;max-height:100%;border:1px solid #52606d;background:#000;touch-action:none;position:relative;z-index:1}.viewer{width:100%;height:auto;cursor:crosshair;image-rendering:pixelated}.viewer.dragging{cursor:grabbing}.magnifier{width:min(100%,500px);height:auto;image-rendering:pixelated}
 .legend{display:flex;gap:16px;font-size:.8rem}.yellow{color:#ffd166}.cyan{color:#67e8f9}.form{height:calc(100vh - 80px);padding:9px;overflow:auto;background:#151b21;position:sticky;top:0;z-index:20;border-left:1px solid #3f4b56}.field{display:block;margin:6px 0}.field span{display:block;color:#b9c4ce;font-size:.8rem}.form textarea,.form input,.form select{width:100%}
-.choice{min-width:110px;min-height:42px;flex:1 1 45%;text-transform:capitalize;font-weight:650}.choice[aria-pressed=true]{background:#075985;border-color:#67e8f9}.choice:disabled{opacity:.35;cursor:not-allowed}.confidence-choice{min-height:36px}.confidence-choice[aria-pressed=true]{background:#166534}.message{margin:5px 0;color:#ffd166;font-weight:600}#status{padding-top:4px}.dirty,.warning{color:#ffd166}.rereview{color:#ff9f1c}.help{font-size:.75rem;color:#b9c4ce}.metadata{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:.75rem}.zone{padding:7px;background:#1e293b;border-left:4px solid #67e8f9}.label-panel{position:sticky;top:-9px;background:#151b21;z-index:4;padding-top:4px}.form-actions{position:sticky;bottom:0;background:#151b21;padding:7px 0;border-top:1px solid #3f4b56}.controls-shield{pointer-events:none;position:absolute;inset:0;z-index:-1}.hidden{display:none!important}#spectrum{width:100%;height:auto;background:#fff}#spectrumIndices{white-space:pre-wrap}
+.choice{min-width:110px;min-height:42px;flex:1 1 45%;text-transform:capitalize;font-weight:650}.choice[aria-pressed=true]{background:#075985;border-color:#67e8f9}.choice:disabled{opacity:.35;cursor:not-allowed}.confidence-choice{min-height:36px}.confidence-choice[aria-pressed=true]{background:#166534}.message{margin:5px 0;color:#ffd166;font-weight:600}#status{padding-top:4px}.dirty,.warning{color:#ffd166}.rereview{color:#ff9f1c}.help{font-size:.75rem;color:#b9c4ce}.metadata{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:.75rem}.zone{padding:7px;background:#1e293b;border-left:4px solid #67e8f9}.label-panel{position:sticky;top:-9px;background:#151b21;z-index:4;padding-top:4px}.form-actions{position:static;background:#151b21;padding:7px 0;border-top:1px solid #3f4b56}.controls-shield{pointer-events:none;position:absolute;inset:0;z-index:-1}.hidden{display:none!important}#spectrum{width:100%;height:auto;background:#fff}#spectrumIndices{white-space:pre-wrap}
 @media(max-width:1200px){.layout{grid-template-columns:minmax(360px,1fr) minmax(310px,.8fr) 350px}.choice{min-width:100px}}
 </style></head><body>
 <header><div class="bar">
-<div id="status">Loading frozen MAIN frame…</div><div id="safetyMessage" class="message">Sample location is frozen; clicking only changes the inspection view.</div><div class="help">Point annotation remains gated on the frozen area contract. Image clicks never choose a biological label.</div>
+<div id="status">Loading frozen MAIN frame…</div><div id="safetyMessage" class="message">Label the frozen yellow center pixel—not the surrounding row.</div><div class="help">Sample location is frozen; clicking only changes the inspection view. Image clicks never choose a biological label.</div>
 </div></header><div class="layout">
 <section class="column"><div class="panel-title">Cube overview · frozen yellow sample · cyan inspection</div><canvas id="viewer" class="viewer" width="900" height="760" aria-label="Cube overview"></canvas><div class="legend"><span class="yellow">□ Frozen sample</span><span class="cyan">＋ Inspection location</span></div></section>
 <section class="column center"><div class="bar"><label>Layer <select id="layer"><option value="natural_rgb">Natural RGB (default)</option><option value="false_colour">False color</option><option value="pca">PCA</option><option value="stored_index">Stored index (not authoritative NDVI)</option><option value="support_outline">Support</option></select></label><button class="zoom-choice" data-zoom="2">2×</button><button class="zoom-choice" data-zoom="4">4×</button><button class="zoom-choice" data-zoom="8">8×</button><button class="zoom-choice" data-zoom="16">16×</button><button id="resetView">Reset</button><label><input id="grid" type="checkbox" checked> Grid</label><label><input id="showInspection" type="checkbox" checked> Inspection</label></div><section class="panel"><div class="panel-title">Large frozen-sample magnifier</div><canvas id="frozenMagnifier" class="magnifier" width="500" height="360"></canvas></section><section class="panel" id="inspectionPanel"><div class="panel-title">Inspection magnifier</div><canvas id="inspectionMagnifier" class="magnifier" width="500" height="300"></canvas></section><section class="panel"><div class="panel-title">Raw center spectrum · Python bands 3–113 · wavelength (nm)</div><canvas id="spectrum" width="500" height="230"></canvas><label class="help"><input id="showMedianSpectrum" type="checkbox" checked> Show valid 3×3 median</label><div id="spectrumIndices" class="help"></div></section></section>
 <aside class="form"><div class="controls-shield" aria-hidden="true"></div><div class="bar"><button id="prev">← Previous</button><button id="next">Next →</button><button id="prevUnlabeled">← Unlabeled</button><button id="nextUnlabeled">Unlabeled →</button><button id="prevCube">← Cube</button><button id="nextCube">Cube →</button></div><span id="counter"></span><div id="progressBreakdown" class="help"></div><label class="field"><span>Cube</span><select id="cubeFilter"></select></label><div class="bar"><label>Role <select id="roleFilter"></select></label><label>Review <select id="reviewFilter"><option value="">All</option><option value="rereview">Re-review</option></select></label></div><div class="label-panel"><h3>Biological annotation</h3>
 <div id="zoneMembership" class="zone">Frozen zone membership loading…</div>
-<div class="field"><span>Selected label (no default)</span><div id="labelButtons" class="button-group" role="group" aria-label="Selected label"></div></div>
+<div class="field"><span>Decision (no default)</span><div id="labelButtons" class="button-group" role="group" aria-label="Selected decision"></div></div>
 <div class="field"><span>Confidence</span><div id="confidenceButtons" class="button-group" role="group" aria-label="Confidence"></div></div></div>
+<label id="weedSubtypeField" class="field hidden"><span>Optional weed subtype</span><select id="weedSubtype"><option value="">Unspecified</option></select></label>
 <label class="field"><span>Reviewer identifier (optional)</span><input id="reviewer"></label><label class="field"><span>Investigator note (optional)</span><textarea id="note"></textarea></label>
-<button id="boundaryCorrection">Boundary needs correction</button><p id="rereview" class="rereview"></p><p id="contradiction" class="warning"></p><div id="metadata" class="metadata"></div><p class="help">Alt+1…Alt+0 choose labels in displayed order; Alt+H/M/L set confidence. No label is suggested or selected automatically.</p><div class="form-actions"><button id="review" class="primary">Mark reviewed</button> <button id="save" class="primary">Save all</button> <button id="saveContinue" class="primary">Save &amp; next unlabeled</button> <button id="clear" class="danger">Clear</button></div>
+<label class="field"><input id="boundaryCorrection" type="checkbox"> Boundary needs correction</label><p id="rereview" class="rereview"></p><p id="contradiction" class="warning"></p><div id="metadata" class="metadata"></div><p class="help">Alt+number chooses a decision; Alt+H/M/L sets confidence. No class is suggested or selected automatically.</p><div class="form-actions"><button id="review" class="primary">Mark reviewed</button> <button id="save" class="primary">Save</button> <button id="saveContinue" class="primary">Save &amp; Next</button> <button id="clear" class="danger">Clear response</button></div>
 </aside></div><script src="/field2-point-viewer.js"></script></body></html>'''
 
 

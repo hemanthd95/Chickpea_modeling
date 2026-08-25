@@ -271,8 +271,11 @@
       button.title = button.disabled ? "Chickpea labels are unavailable in this frozen non-chickpea domain; use boundary needs correction if needed." : `Alt+${schema.label_shortcuts[button.dataset.value]}`;
     }
     $("zoneMembership").textContent = `Frozen domain ${sample.domain_code}: ${sample.domain_name.replaceAll("_", " ")} · ${sample.domain_reporting_stratum.replaceAll("_", " ")} · raw polygon memberships: ${sample.raw_polygon_memberships || "none"} · precedence applied: ${sample.precedence_applied}`;
-    $("boundaryCorrection").setAttribute("aria-pressed", String(record.boundary_needs_correction));
-    $("boundaryCorrection").classList.toggle("active", record.boundary_needs_correction);
+    $("boundaryCorrection").checked = record.boundary_needs_correction;
+    if ($("weedSubtype")) {
+      $("weedSubtype").value = record.optional_weed_subtype || "";
+      $("weedSubtypeField").classList.toggle("hidden", schema.workflow !== "chickpea_review_v1" || selectedLabel !== "weed_unspecified");
+    }
     $("reviewer").value = record.reviewer_identifier;
     $("note").value = record.investigator_note;
     $("review").textContent = record.reviewed && !record.requires_visual_rereview ? "Reviewed ✓" : "Mark reviewed";
@@ -283,7 +286,9 @@
     $("metadata").textContent = `sample ID: ${sample.sample_id}\ncube ID: ${sample.cube_id}\nfrozen row, column: ${sample.row}, ${sample.column}\ninspection row, column: ${viewerState.inspection.row}, ${viewerState.inspection.column}\nfrozen cube role: ${sample.cube_evaluation_role}\ninvestigator cube notes: ${sample.cube_investigator_notes || "(none)"}\ndomain: ${sample.domain_name} (${sample.domain_reporting_stratum})\nRGB wavelengths: ${wavelengths.red} / ${wavelengths.green} / ${wavelengths.blue} nm\ndisplay version: ${record.annotation_display_version}\nframe: MAIN only · reserve unavailable`;
     const reviewed = Object.values(annotations.annotations).filter((item) => item.reviewed).length;
     const rereview = Object.values(annotations.annotations).filter((item) => item.requires_visual_rereview).length;
-    $("counter").textContent = `${sampleIndex + 1} / ${visible.length} filtered · ${reviewed}/800 reviewed · ${rereview} re-review`;
+    const reviewTotal = schema.manual_review_count || schema.total_main_count || 800;
+    const queueReviewed = samples.filter((item) => annotations.annotations[item.sample_id].reviewed).length;
+    $("counter").textContent = `${sampleIndex + 1} / ${visible.length} queue · ${queueReviewed}/${reviewTotal} reviewed${rereview ? ` · ${rereview} re-review` : ""}`;
     const cubeRecords = samples.filter((item) => item.cube_id === sample.cube_id).map((item) => annotations.annotations[item.sample_id]);
     const domainRecords = samples.filter((item) => item.domain_name === sample.domain_name).map((item) => annotations.annotations[item.sample_id]);
     const classCounts = Object.values(annotations.annotations).reduce((counts, item) => { if (item.selected_label) counts[item.selected_label] = (counts[item.selected_label] || 0) + 1; return counts; }, {});
@@ -327,6 +332,15 @@
     }
     setStatus("No matching MAIN sample in that direction.", true);
   }
+  function moveNextUnreviewed() {
+    for (let offset = 1; offset <= visible.length; offset += 1) {
+      const candidate = (sampleIndex + offset) % visible.length;
+      if (!annotations.annotations[visible[candidate].sample_id].reviewed) {
+        sampleIndex = candidate; loadImage(true); return;
+      }
+    }
+    setStatus("All visible chickpea-review points are reviewed.");
+  }
   function updateAnnotation() {
     const sample = currentSample();
     const record = currentRecord();
@@ -334,6 +348,11 @@
     record.confidence = selectedConfidence;
     record.reviewer_identifier = $("reviewer").value.trim();
     record.investigator_note = $("note").value;
+    if (schema.workflow === "chickpea_review_v1") {
+      record.manual_decision = selectedLabel;
+      record.optional_weed_subtype = selectedLabel === "weed_unspecified" ? $("weedSubtype").value : "";
+      record.reference_provenance = ({ chickpea: "investigator_chickpea", weed_unspecified: "investigator_nonchickpea_vegetation", chickpea_weed_mixed: "investigator_chickpea", uncertain: "investigator_uncertain" })[selectedLabel] || "";
+    }
     record.role_contradiction = selectedLabel === "chickpea" && sample.cube_evaluation_role === "chickpea_absent_negative_control";
     record.reviewed = false;
     record.review_timestamp = "";
@@ -416,7 +435,8 @@
   function buildChoices() {
     for (const value of schema.labels) {
       const button = document.createElement("button");
-      button.type = "button"; button.className = "choice label-choice"; button.dataset.value = value; button.textContent = `${value.replaceAll("_", " ")} [Alt+${schema.label_shortcuts[value]}]`; button.setAttribute("aria-pressed", "false");
+      const display = (schema.label_display && schema.label_display[value]) || value.replaceAll("_", " ");
+      button.type = "button"; button.className = "choice label-choice"; button.dataset.value = value; button.textContent = `${display} [Alt+${schema.label_shortcuts[value]}]`; button.setAttribute("aria-pressed", "false");
       button.addEventListener("click", () => setChoice("selected_label", value));
       $("labelButtons").appendChild(button);
     }
@@ -430,8 +450,8 @@
   function bindControls() {
     $("prev").addEventListener("click", () => move(-1));
     $("next").addEventListener("click", () => move(1));
-    $("prevUnlabeled").addEventListener("click", () => moveMatching(-1, (sample) => !annotations.annotations[sample.sample_id].selected_label));
-    $("nextUnlabeled").addEventListener("click", () => moveMatching(1, (sample) => !annotations.annotations[sample.sample_id].selected_label));
+    $("prevUnlabeled").addEventListener("click", () => moveMatching(-1, (sample) => !annotations.annotations[sample.sample_id].reviewed));
+    $("nextUnlabeled").addEventListener("click", () => schema.workflow === "chickpea_review_v1" ? moveNextUnreviewed() : moveMatching(1, (sample) => !annotations.annotations[sample.sample_id].reviewed));
     $("prevCube").addEventListener("click", () => moveMatching(-1, (sample, current) => sample.cube_id !== current.cube_id));
     $("nextCube").addEventListener("click", () => moveMatching(1, (sample, current) => sample.cube_id !== current.cube_id));
     for (const id of ["cubeFilter", "roleFilter", "reviewFilter"]) $(id).addEventListener("change", filterSamples);
@@ -443,27 +463,38 @@
     $("showMedianSpectrum").addEventListener("change", drawSpectrum);
     $("reviewer").addEventListener("change", updateAnnotation);
     $("note").addEventListener("change", updateAnnotation);
-    $("boundaryCorrection").addEventListener("click", () => {
+    $("weedSubtype").addEventListener("change", updateAnnotation);
+    $("boundaryCorrection").addEventListener("change", () => {
       const record = currentRecord();
-      record.boundary_needs_correction = !record.boundary_needs_correction;
-      if (record.boundary_needs_correction) { selectedLabel = ""; record.selected_label = ""; }
+      record.boundary_needs_correction = $("boundaryCorrection").checked;
+      if (schema.workflow !== "chickpea_review_v1" && record.boundary_needs_correction) { selectedLabel = ""; record.selected_label = ""; }
       record.reviewed = false; record.review_timestamp = ""; setDirty(); renderForm();
     });
     $("review").addEventListener("click", () => {
       updateAnnotation();
       const record = currentRecord();
-      if (record.boundary_needs_correction) return setStatus("Save the boundary-needs-correction flag; do not force a biological label.", true);
+      if (schema.workflow !== "chickpea_review_v1" && record.boundary_needs_correction) return setStatus("Save the boundary-needs-correction flag; do not force a biological label.", true);
       if (!selectedLabel || !selectedConfidence) return setStatus("Select a label and confidence before marking reviewed.", true);
       record.reviewed = true; record.review_timestamp = new Date().toISOString(); record.requires_visual_rereview = false; setDirty(); render();
     });
     $("clear").addEventListener("click", () => {
       if (!confirm("Clear this MAIN annotation?")) return;
       const sample = currentSample(); const old = currentRecord();
-      annotations.annotations[sample.sample_id] = { ...old, selected_label: "", confidence: "", investigator_note: "", reviewed: false, review_timestamp: "", reviewer_identifier: "", role_contradiction: false, requires_visual_rereview: false, boundary_needs_correction: false };
+      annotations.annotations[sample.sample_id] = { ...old, selected_label: "", manual_decision: "", optional_weed_subtype: "", reference_provenance: "", confidence: "", investigator_note: "", reviewed: false, review_timestamp: "", reviewer_identifier: "", role_contradiction: false, requires_visual_rereview: false, boundary_needs_correction: false };
       setDirty(); render();
     });
     $("save").addEventListener("click", save);
-    $("saveContinue").addEventListener("click", async () => { if (await save()) moveMatching(1, (sample) => !annotations.annotations[sample.sample_id].selected_label); });
+    $("saveContinue").addEventListener("click", async () => {
+      if (schema.workflow === "chickpea_review_v1") {
+        updateAnnotation(); const record = currentRecord();
+        if (!selectedLabel || !selectedConfidence) return setStatus("Choose one decision and High, Medium, or Low confidence before Save & Next.", true);
+        record.reviewed = true; record.review_timestamp = new Date().toISOString(); record.requires_visual_rereview = false; setDirty();
+      }
+      if (await save()) {
+        if (schema.workflow === "chickpea_review_v1") moveNextUnreviewed();
+        else moveMatching(1, (sample) => !annotations.annotations[sample.sample_id].reviewed);
+      }
+    });
     document.addEventListener("keydown", (event) => {
       if (["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName) && !(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
@@ -488,14 +519,26 @@
       fetch("/api/samples").then((response) => response.json()), fetch("/api/manifest").then((response) => response.json()),
       fetch("/api/schema").then((response) => response.json()), fetch("/api/annotations").then((response) => response.json()),
     ]);
-    if (samples.length !== 800 || new Set(samples.map((item) => item.sampling_frame)).size !== 1 || samples[0].sampling_frame !== "main" || schema.reserve_exposed) throw new Error("Expected exact frozen 800-point MAIN frame with reserve locked");
+    const expectedSamples = schema.manual_review_count || 800;
+    if (samples.length !== expectedSamples || new Set(samples.map((item) => item.sampling_frame)).size !== 1 || samples[0].sampling_frame !== "main" || schema.reserve_exposed) throw new Error(`Expected exact frozen ${expectedSamples}-point manual MAIN queue with reserve locked`);
     if (!schema.area_geometry_frozen || !samples.every((item) => item.domain_code && item.domain_name && item.domain_reporting_stratum)) throw new Error("Frozen area-domain membership is required before point annotation");
     if (!schema.raw_spectrum_available || schema.model_outputs_available) throw new Error("Expected prediction-free raw spectrum service only");
     if (schema.default_layer !== "natural_rgb" || schema.display_version !== annotations.annotation_display_version) throw new Error("Natural RGB display provenance mismatch");
     buildChoices(); bindControls(); bindViewerEvents();
+    if (schema.workflow === "chickpea_review_v1") {
+      $("safetyMessage").textContent = schema.center_instruction;
+      $("next").textContent = "Skip"; $("nextUnlabeled").textContent = "Next unreviewed";
+      $("prevUnlabeled").classList.add("hidden"); $("prevCube").classList.add("hidden"); $("nextCube").classList.add("hidden");
+      $("save").classList.add("hidden"); $("review").classList.add("hidden");
+      for (const subtype of schema.optional_weed_subtypes) { const option = document.createElement("option"); option.value = subtype; option.textContent = subtype.replaceAll("_", " "); $("weedSubtype").appendChild(option); }
+    }
     for (const value of ["", ...new Set(samples.map((item) => item.cube_id))]) { const option = document.createElement("option"); option.value = value; option.textContent = value || "All cubes"; $("cubeFilter").appendChild(option); }
     for (const value of ["", ...new Set(samples.map((item) => item.cube_evaluation_role))]) { const option = document.createElement("option"); option.value = value; option.textContent = value ? value.replaceAll("_", " ") : "All roles"; $("roleFilter").appendChild(option); }
     visible = samples;
+    if (schema.workflow === "chickpea_review_v1") {
+      const firstUnreviewed = visible.findIndex((item) => !annotations.annotations[item.sample_id].reviewed);
+      sampleIndex = firstUnreviewed >= 0 ? firstUnreviewed : 0;
+    }
     loadImage(true);
   }
   root.__field2ViewerDebug = {

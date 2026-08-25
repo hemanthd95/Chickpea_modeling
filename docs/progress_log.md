@@ -1046,3 +1046,23 @@ corrections.
   and non-chickpea-domain label restrictions.
 - Focused tests passed 61/61 and the full repository suite passed 127/127; all
   frozen Field 1/Field 2 validators passed without model or checkpoint use.
+
+### Frozen prediction-free Field 2 chickpea-review policy
+
+- Froze the predeclared raw-reflectance NDVI rule at 669.09/798.91 nm and 0.30
+  without Field 2 tuning or use of the stored scalar product.
+- Derived separate, provenance-bearing references: 99 rule soil, 146 alley field
+  weed, 78 outside OOD weed, 477 crop/unassigned vegetation reviews, and zero
+  invalid, while keeping the 800-record neutral store and locked reserve intact.
+- Restricted the investigator UI to four chickpea decisions with required
+  confidence, optional notes/subtype/boundary correction, Save & Next, skip,
+  clear, progress, and first-unreviewed resume.
+- Documented that the fixed threshold classified every frozen Field 1 confident
+  pixel—including soil—as vegetation in the audited raw units; the unchanged
+  rule-assisted endpoint is therefore secondary rather than independent gold.
+- Added an isolated Firefox save/reload regression that verifies clickable
+  controls, queue restriction, first-unreviewed resume, reserve 404, and an
+  unchanged production annotation hash.
+- Focused tests passed 44/44 and the complete repository suite passed 134/134;
+  every frozen Field 1/Field 2 validator, including deterministic area
+  recompile, passed.
