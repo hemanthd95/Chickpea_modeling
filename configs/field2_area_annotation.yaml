@@ -1,0 +1,97 @@
+version: field2_area_annotation_v1
+field_identifier: Field 2
+expected_cube_count: 40
+port: 8774
+
+inputs:
+  field1_benchmark_contract:
+    path: metadata/local/contracts/supervised_finalization_v1/field1_confident_supervised_benchmark_contract.yaml
+    sha256: dcef1413537e83d18afe0ed94e2d3bb3fb625cda1eb49b6069b3145ae2eee4d1
+  source_inventory_contract:
+    path: metadata/local/contracts/field2_georectified_inventory_contract.yaml
+    sha256: 21c18f07ea92cc989cdc32b580b6a450669463e42183efe1b3ce326aebf9cd1e
+  valid_support_contract:
+    path: metadata/local/contracts/field2_valid_support_contract.yaml
+    sha256: 23ea7a573c1b0de0856515f632e6d996fb3ce221001d4c887ba8b5049ee003ba
+  review_manifest:
+    path: metadata/local/reports/field2_cube_role_review/field2_cube_role_review_manifest.csv
+    sha256: 81de7834c1e3f538a5b1b19f905dbda36521baab5a14e84da261678a4fdceaf2
+  natural_rgb_manifest:
+    path: metadata/local/reports/field2_annotation_display/field2_natural_rgb_manifest.csv
+    sha256: cc14f4371485a9610181f480124feffb681e7415af01afbf9c9edcfb5bcb6f41
+  valid_support_manifest:
+    path: metadata/local/reports/field2_valid_support/field2_valid_support_mask_manifest.csv
+    sha256: 1f48ffe67d7ad2cbf95cca5c2e6e98d15245843435c519bbb8a67841c2bbf3e3
+  cube_role_contract:
+    path: metadata/local/contracts/field2_cube_role_contract.yaml
+    sha256: a76425dd259f4fb245db6d51824a99d4f960e044ca5aab2cfc114578bcf06c96
+  sampling_contract:
+    path: metadata/local/contracts/field2_blind_sampling_frame_contract.yaml
+    sha256: 78c0378105e23cb7cc42da0871f144f06532bf7b5ed83ea51c262b4094e229d2
+  rgb_display_contract:
+    path: metadata/local/contracts/field2_annotation_display_addendum.yaml
+    sha256: 1854458fb428b7c4b7eb1ec15bbc5b354dc21573f35944ef2cefbbb36ef08a7f
+
+annotation:
+  output_root: metadata/local/annotations/field2_area_zones
+  maximum_raster_extension_fraction: 0.10
+  coverage_modes:
+    - entire_support_research_field
+    - entire_support_outside_research_field
+    - mixed_manual_boundaries
+    - uncertain_requires_review
+  zone_types:
+    - research_crop_area
+    - alley
+    - outside_research_field
+    - uncertain_boundary
+  zone_definitions:
+    research_crop_area: "investigator-identified planted-row/research-plot domain; not a biological chickpea label."
+    alley: "investigator-confirmed plot or tractor alley; only soil and weeds occur by investigator rule."
+    outside_research_field: "valid imagery outside the intended experiment; it may contain soil or varied vegetation."
+    uncertain_boundary: "geometry that cannot be placed confidently."
+
+operational_geometry:
+  output_root: metadata/local/annotations/field2_area_zones/operational_geometry
+  source_vertices_immutable: true
+  terminal_near_duplicate_distance_pixels: 12.0
+  terminal_repair_scope: operational_only
+  validity_repair: deterministic_raster_polygonize_all_components
+  pixel_domain_precedence_low_to_high:
+    - research_crop_area
+    - uncertain_boundary
+    - alley
+    - outside_research_field
+  precedence_rule: outside_research_field>alley>uncertain_boundary>research_crop_area>unassigned_valid_support
+  overlap_policy: warning_and_deterministic_precedence
+  blank_mode_with_polygons: mixed_manual_boundaries
+  biological_labels_assigned: false
+
+freeze:
+  output_root: metadata/local/contracts/field2_area_zone_freeze
+  contract: metadata/local/contracts/field2_area_zone_contract.yaml
+  main_membership: field2_area_zone_membership_main.csv
+  reserve_membership_locked: field2_area_zone_membership_reserve_locked.csv
+  counts: field2_area_zone_counts.csv
+  precedence_summary: field2_area_precedence_summary.csv
+  mask_manifest: field2_area_domain_mask_manifest.csv
+  domain_pixel_totals: field2_area_domain_pixel_totals.csv
+  effective_mode_reconciliation: field2_area_effective_mode_reconciliation.csv
+  geometry_repair_audit: field2_area_operational_geometry_audit.csv
+  operational_geometry: field2_area_operational_geometry.geojson
+  mask_root: masks
+  raw_membership_mask_root: raw_membership_masks
+  expected_reviewed_cubes: 40
+  reserve_coordinates_in_outputs: false
+  overwrite_prohibited: true
+
+safety:
+  localhost_only: true
+  source_open_mode: read_only
+  gdal_pam_enabled: "NO"
+  biological_labels_prohibited: true
+  predictions_prohibited: true
+  probabilities_prohibited: true
+  checkpoints_prohibited: true
+  automatic_geometry_inference_prohibited: true
+  morphology_prohibited: true

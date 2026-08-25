@@ -1,0 +1,85 @@
+version: field2_chickpea_review_policy_v1
+field_identifier: Field 2
+v2_sampling_config: configs/field2_area_sampling_v2.yaml
+field1_confident_label_config: configs/confident_labels_v1.yaml
+spectral_band_config: configs/spectral_bands.yaml
+
+ndvi_rule:
+  red_target_nm: 669.09
+  nir_target_nm: 798.91
+  expected_red_python_band_index: 67
+  expected_nir_python_band_index: 97
+  expected_red_envi_band_number: 68
+  expected_nir_envi_band_number: 98
+  formula: (NIR - Red) / (NIR + Red)
+  soil_threshold: 0.30
+  soil_operator: "<"
+  vegetation_operator: ">="
+  invalid_rule: nonfinite input or nonfinite/zero denominator
+  stored_scalar_is_authoritative_ndvi: false
+
+manual_review:
+  eligible_domains: [research_crop_area, unassigned_valid_support]
+  minimum_ndvi: 0.30
+  decisions:
+    chickpea: Chickpea
+    weed_unspecified: Not chickpea
+    chickpea_weed_mixed: Chickpea/weed mixed
+    uncertain: Uncertain
+  optional_weed_subtypes: [ordinary_weed, tall_grass_weed, other_weed]
+  confidence: [high, medium, low]
+  resume_policy: first_unreviewed
+  center_instruction: Label the frozen yellow center pixel—not the surrounding row.
+
+provisional_reference_rules:
+  alley:
+    soil: [soil, rule_based_soil_ndvi_0p30]
+    vegetation: [field_weed, investigator_area_constrained_field_weed]
+  outside_research_field:
+    soil: [soil, rule_based_soil_ndvi_0p30]
+    vegetation: [outside_weed_ood, investigator_area_constrained_outside_weed_ood]
+  research_crop_area:
+    soil: [soil, rule_based_soil_ndvi_0p30]
+    vegetation: [pending_investigator_chickpea_review, ""]
+  unassigned_valid_support:
+    soil: [soil, rule_based_soil_ndvi_0p30]
+    vegetation: [pending_investigator_chickpea_review, ""]
+  invalid: [nodata_invalid, nodata_invalid]
+
+field1_audit:
+  authoritative_manifest: metadata/local/authoritative_manifest.csv
+  confident_label_contract: metadata/local/contracts/confident_labels_v1/field1_confident_label_candidate_contract.yaml
+  canonical_label_root: data/processed/field1_confident_labels_v1/canonical_outer_evaluation
+  class_mapping: {soil: 0, chickpea: 1, weed: 2, unresolved: 255}
+  threshold_optimization_prohibited: true
+
+outputs:
+  report_root: metadata/local/reports/field2_chickpea_review_policy
+  provisional_references: field2_v2_provisional_references.csv
+  workload_by_cube_domain: field2_v2_manual_workload_by_cube_domain.csv
+  field1_ndvi_audit: field1_frozen_labels_ndvi_0p30_audit.csv
+  field1_band_source_audit: field1_ndvi_band_source_audit.csv
+  field2_band_source_audit: field2_ndvi_band_source_audit.csv
+  audit_yaml: field2_chickpea_review_policy_audit.yaml
+  contract: metadata/local/contracts/field2_chickpea_review_policy_contract.yaml
+  sha256_manifest: metadata/local/contracts/field2_chickpea_review_policy_sha256_manifest.csv
+
+evaluation_policy:
+  primary_endpoint: investigator_reviewed_chickpea_vs_nonchickpea
+  primary_metrics: [precision, recall, f1, pr_auc, false_positive_rate]
+  estimators: [equal_cube, design_weighted]
+  confidence_stratified_sensitivity: true
+  secondary_endpoint: rule_assisted_chickpea_weed_soil
+  secondary_not_independent_gold_standard: true
+  outside_research_field: separate_open_set_ood_challenge
+  alley: in_distribution_field1_type_weed_soil
+  mixed_and_uncertain: exclude_primary_hard_labels_and_report_sensitivity
+  field2_threshold_or_model_tuning_prohibited: true
+
+safety:
+  frozen_v2_frames_immutable: true
+  reserve_locked_and_unread_by_materializer: true
+  checkpoint_loading_prohibited: true
+  model_output_use_prohibited: true
+  field2_label_tuning_prohibited: true
+  production_annotation_write_prohibited_during_materialization: true

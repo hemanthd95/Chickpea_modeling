@@ -1,0 +1,117 @@
+label_mapping:
+  1: soil
+  2: chickpea
+  3: weed
+
+label_table_exclusions:
+  field1_cube28:
+    reason: Full SHA-256 duplicate of Cube 24; class counts agree with Cube 24 masks.
+    duplicate_of: field1_cube24
+  field1_cube30:
+    reason: Full SHA-256 duplicate of Cube 32; class counts agree with Cube 32 masks.
+    duplicate_of: field1_cube32
+  field1_cube56:
+    reason: Full SHA-256 duplicate of Cube 35; class counts agree with Cube 35 masks.
+    duplicate_of: field1_cube35
+
+mask_exclusions:
+  - field1_cube31/combined_mask
+  - field1_cube36/combined_mask
+  - field1_cube38/combined_mask
+  - field1_cube39/combined_mask
+  - field1_cube31/chickpea_Field1_Cube31_mask.tiff
+  - field1_cube36/chickpea_Field1_Cube36_mask.tiff
+  - field1_cube38/chickpea_Field1_Cube38_mask.tiff
+  - field1_cube39/chickpea_Field1_Cube39_mask.tiff
+
+mask_overrides:
+  field1_cube31:
+    chickpea_mask: FIeld 1 Cube 31/chickpea_Field1_Cube31_aligned.tiff
+    weed_mask: FIeld 1 Cube 31/weed_mask_Field1_Cube31_generated.tif
+
+sensitivity_masks:
+  field1_cube31:
+    weed_mask: FIeld 1 Cube 31/weed_mask_Field1_Cube31_gps.tiff
+    note: IoU with generated mask is 0.811867; do not silently merge them.
+
+archive_cube20:
+  status: approved_for_deterministic_mask_materialization
+  reflectance: Kusi chickpea project/Kusi cubes analysis trials/kusi_field1_target_Pika_L-GigE_20.bil-Georectify.bip
+  categorical_mask: Kusi chickpea project/Kusi cubes analysis trials/Field_1_Cube20_combined_mask.tiff
+  categorical_labels: {1: soil, 2: chickpea, 3: weed}
+  resampling: nearest
+  evidence:
+    weed_new_iou: 1.0
+    soil_binary_iou: 0.982005
+    chickpea_binary_variants_rejected: true
+  excluded_products:
+    - RGB and multiband visualization masks
+    - DESKTOP copies with continuous display values
+    - original weed mask (IoU 0.209020 with categorical weed)
+  note: Derive all three mutually exclusive masks from the categorical source; never merge binary variants.
+
+rules:
+  synthetic_data_allowed: false
+  field2_locked: true
+  invalid_masks_are_never_thresholded_automatically: true
+  raw_files_are_never_modified: true
+  mask_precedence_high_to_low: [weed, chickpea, soil]
+  precedence_evidence: Weed-soil overlap is zero; Cube 24 chickpea-weed overlap exactly explains its CSV count difference.
+  field_identity_boundary_buffer_m: 1.5
+  field_identity_buffer_is_not_chickpea_constraint_buffer: true
+  chickpea_plot_constraint_buffer_candidates_m: [0.0, 0.15, 0.30, 0.50, 1.0]
+
+investigator_phenology_exclusions:
+  field1_cube24:
+    decision_date: 2026-08-07
+    reason: Recent planting date substantially closer to the 2025-05-06 image collection; chickpea development is not comparable to the primary Field 1 set.
+    exclude_from: [refined_supervised_mask_training, refined_supervised_primary_evaluation]
+    retain_for: [immutable_inventory, documented_sensitivity_analysis]
+  field1_cube28:
+    decision_date: 2026-08-07
+    reason: Recent planting date substantially closer to the 2025-05-06 image collection; chickpea development is not comparable to the primary Field 1 set.
+    exclude_from: [refined_supervised_mask_training, refined_supervised_primary_evaluation]
+    retain_for: [immutable_inventory, documented_sensitivity_analysis]
+
+candidate_label_expansion:
+  field1_cube12:
+    source: investigator_hand_drawn_chickpea_region_polygons
+    status: trusted_positive_support_incomplete_coverage
+    evidence: Investigator-confirmed chickpea rows with strong growth from earlier planting; omitted small patches remain unknown.
+  field1_cube14:
+    source: investigator_hand_drawn_chickpea_region_polygons
+    status: trusted_positive_support_incomplete_coverage
+    evidence: Investigator-confirmed chickpea rows with strong growth from earlier planting; omitted small patches remain unknown.
+  field1_cube15:
+    source: investigator_hand_drawn_chickpea_region_polygons
+    status: trusted_positive_support_incomplete_coverage
+    evidence: Investigator-confirmed chickpea rows with strong growth from earlier planting; omitted small patches remain unknown.
+
+trusted_expansion_visual_acceptance:
+  decision_date: 2026-08-11
+  accepted_cubes: [field1_cube12, field1_cube14, field1_cube15]
+  accepted_content: high_confidence_chickpea_positive_support_only
+  evidence: Investigator-trusted row polygons, held-out point threshold precision, and imagery-backed side-by-side acceptance review.
+  outside_polygon_semantics: unknown_unlabeled_not_negative
+  unresolved_semantics: withheld_from_training_labels
+  weed_labels_inferred: false
+  existing_authoritative_masks_replaced: false
+
+chickpea_region_annotation_policy:
+  decision_date: 2026-08-10
+  investigator_decision: Trust hand-drawn chickpea row polygons over the historical chickpea masks.
+  primary_spatial_authority: investigator_chickpea_region_polygons
+  historical_chickpea_mask_role: comparison_only_not_a_veto
+  polygon_coverage_semantics: trusted_positive_support_incomplete_by_design
+  outside_polygon_policy: unknown_unlabeled_not_evidence_of_absence
+  polygon_core_policy: spatially_eligible_only_not_an_automatic_chickpea_label
+  soil_rule: ndvi_below_0.30_only_from_a_validated_ndvi_product_or_provenance_tracked_soil_mask
+  raw_reflectance_dn_ndvi_status: rejected_as_label_source_after_zero_soil_result_across_all_19_polygon_cubes
+  weed_rule: require_observed_spectral_evidence_after_soil_removal
+  uncertainty_edge_belt_m: 0.05
+  explicit_alley_precedence: true
+  tyre_track_policy: geometry_evidence_only_no_automatic_relabel
+  cubes_24_and_28: sensitivity_only
+  cubes_12_14_15: trusted_investigator_positive_support_for_conservative_chickpea_label_expansion
+  cubes_12_14_15_weed_policy: no_automatic_weed_labels_without_local_reference_support
+  authoritative_masks_modified: false

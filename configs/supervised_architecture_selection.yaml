@@ -1,0 +1,19 @@
+diagnostic_fold: 1
+source_report_stage: models/supervised_architecture_ablation_fold1
+
+architectures:
+  - center_spectrum_mlp
+  - spatial_average_cnn
+  - center_context_fusion
+
+model_seeds: [42, 43, 44]
+minimum_validation_cubes: 6
+
+primary_architecture: center_context_fusion
+primary_comparator: spatial_average_cnn
+baseline_architectures:
+  - spatial_average_cnn
+  - center_spectrum_mlp
+
+contract_filename: field1_supervised_architecture_contract.yaml
+visual_filename: field1_supervised_architecture_overview.png

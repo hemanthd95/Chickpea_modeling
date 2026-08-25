@@ -1,0 +1,30 @@
+primary:
+  name: pika_l_401_869nm_lt1pct_saturation
+  first_band_index: 3
+  last_band_index_inclusive: 113
+  band_count: 111
+  wavelength_min_nm: 401.84
+  wavelength_max_nm: 869.34
+  criteria:
+    nominal_lower_bound_nm: 400
+    maximum_global_saturation_fraction: 0.01
+    zero_fraction_required: 0.0
+
+excluded:
+  lower_edge:
+    band_indices: [0, 1, 2]
+    reason: Wavelengths below the nominal 400 nm lower bound.
+  saturated_upper_edge:
+    first_band_index: 114
+    last_band_index_inclusive: 149
+    reason: Global saturation exceeds 1%; saturation becomes effectively complete near the upper edge.
+
+sensitivity:
+  include_sub400nm:
+    first_band_index: 0
+    last_band_index_inclusive: 113
+  extend_to_lt5pct_saturation:
+    first_band_index: 3
+    last_band_index_inclusive: 116
+    wavelength_max_nm: 882.63
+

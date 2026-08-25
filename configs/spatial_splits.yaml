@@ -1,0 +1,32 @@
+grouping:
+  # Map-coordinate groups prevent repeat observations in overlapping cubes from
+  # crossing folds. The zero origin makes IDs reproducible across workstations.
+  block_size_m: 5.0
+  origin_x_m: 0.0
+  origin_y_m: 0.0
+
+candidate_split:
+  status: accepted_pending_contract_materialization
+  folds: 5
+  seed: 42
+  angle_step_degrees: 5
+  minimum_groups_per_fold: 20
+  minimum_labeled_groups_per_fold: 10
+  balance_weights:
+    spatial_groups: 0.5
+    labeled_groups: 0.5
+    soil: 1.0
+    chickpea: 3.0
+    weed: 1.0
+    all_labels: 0.5
+  # Reserved around fold boundaries during sampling. This exceeds the half-width
+  # of a 15-pixel patch at the observed 1.5 cm Cube 20 resolution.
+  boundary_exclusion_m: 0.30
+  acceptance:
+    require_one_connected_component_per_fold: true
+    minimum_chickpea_share: 0.15
+    maximum_chickpea_share: 0.25
+    minimum_labeled_observation_share: 0.15
+    maximum_labeled_observation_share: 0.25
+    minimum_spatial_group_share: 0.10
+    maximum_spatial_group_share: 0.30

@@ -1,0 +1,356 @@
+status: review_only_ready_for_evidence_audit
+field: Field 1
+source_class: authoritative_chickpea
+reassignment_if_accepted: weed
+
+# These values are fixed before candidate masks are inspected. No value is
+# automatically selected from the resulting retention rates.
+plot_buffer_candidates_m: [0.00, 0.15]
+row_corridor_half_width_candidates_m: [0.06, 0.10, 0.15]
+plot_constraint_mode: review_only
+
+row_detection:
+  planter_rows_per_block: 6
+  known_planter_row_spacing_m: 0.9144
+  lattice_phase_mode: independent_per_six_row_block
+  lattice_phase_fit_half_width_m: 0.10
+  hough_threshold: 40
+  minimum_line_length_m: 0.60
+  maximum_line_gap_m: 0.30
+  orientation_bin_degrees: 2.0
+  orientation_tolerance_degrees: 8.0
+  minimum_inlier_lines: 3
+  extend_inlier_lines_across_raster: true
+  offset_cluster_tolerance_m: 0.12
+  minimum_cluster_span_m: 1.50
+  minimum_cluster_total_line_length_m: 1.50
+  local_orientation_window_length_m: 0.60
+  local_orientation_window_width_m: 0.06
+  local_orientation_minimum_ratio: 1.10
+
+alley_review:
+  derive_experimental_envelope_from_verified_plots: false
+  require_explicit_alley_geometry: true
+  plot_boundary_buffer_m: 0.15
+
+review:
+  write_candidate_geotiffs: true
+  automatically_replace_authoritative_masks: false
+  automatically_retrain_models: false
+  field2_locked: true
+  raw_masks_are_immutable: true
+
+investigator_guidance:
+  field1_cube20:
+    orange_default_action: retain_as_chickpea
+    manual_review_region: top_between_rows_and_alleys
+  phenology_exclusions_from_refined_primary_supervised_analysis:
+    field1_cube24:
+      reason: recent planting substantially closer to 2025-05-06 image collection
+      retain_for: [immutable_inventory, sensitivity_analysis]
+    field1_cube28:
+      reason: recent planting substantially closer to 2025-05-06 image collection
+      retain_for: [immutable_inventory, sensitivity_analysis]
+  optional_mask_expansion:
+    cubes: [field1_cube12, field1_cube14, field1_cube15]
+    source: investigator_hand_drawn_chickpea_region_polygons
+    status: trusted_investigator_positive_support_incomplete_coverage
+    note: Investigator is fully confident in the marked chickpea rows and reports strong chickpea growth from earlier planting. Polygons intentionally omit small or difficult chickpea patches, so outside-polygon pixels remain unknown rather than negative.
+
+planter_pass_reconstruction:
+  status: geometry_evidence_audit_ready
+  evidence_layers:
+    - pca
+    - pca_first_derivative
+    - pca_second_derivative
+  planter_rows_per_pass: 6
+  row_spacing_m: 0.9144
+  detect_headland_turns: true
+  detect_wheel_tracks: true
+  reconstruct_at_field_mosaic_level: true
+  deduplicate_overlapping_cube_observations: true
+  fit_independent_phase_per_pass: true
+  geometry_evidence_is_not_a_class_label: true
+  require_investigator_visual_approval: true
+  evidence_audit:
+    maximum_preview_dimension_pixels: 900
+    canny_low: 60
+    canny_high: 150
+    hough_threshold: 35
+    minimum_segment_length_m: 0.50
+    maximum_segment_gap_m: 0.20
+    parallel_tolerance_degrees: 12.0
+    candidate_grouping_radius_m: 0.20
+    minimum_candidate_area_m2: 0.05
+  # Replacement for the overly permissive generic nonparallel-line audit.
+  # PCA is recomputed consistently from each original observed reflectance cube,
+  # and only broad structure transverse to the crop rows is proposed for review.
+  standardized_turn_band_audit:
+    maximum_preview_dimension_pixels: 900
+    maximum_pca_fit_samples: 100000
+    seed: 42
+    structure_percentile: 85
+    profile_smoothing_m: 0.12
+    minimum_valid_width_fraction: 0.25
+    edge_exclusion_m: 0.50
+    minimum_candidate_separation_m: 0.75
+    minimum_robust_z: 3.0
+    minimum_prominence_z: 1.5
+    minimum_band_width_m: 0.15
+    maximum_band_width_m: 4.00
+  outputs:
+    - pca_derivative_false_colour_overview
+    - wheel_track_candidates
+    - turn_arc_candidates
+    - numbered_six_row_passes
+    - overlap_deduplicated_pass_map
+
+# Investigator row polygons are spatial eligibility priors, not exact class
+# boundaries. These tolerances are audited before any refined mask is written.
+chickpea_region_polygon_audit:
+  seam_snap_maximum_m: 0.30
+  outward_edge_tolerance_candidates_m: [0.00, 0.05, 0.10, 0.15]
+  visual_review_tolerance_m: 0.15
+  clip_to_observed_raster_support: true
+  explicit_alley_precedence: true
+  automatically_materialize_masks: false
+
+# Frozen after investigator review of the polygon-versus-historical-mask QC.
+# The old mask is retained only for comparison and cannot rescue pixels outside
+# the investigator prior.
+polygon_guided_candidate_profile:
+  spatial_authority: investigator_chickpea_region_polygons
+  polygon_coverage_semantics: trusted_positive_support_incomplete_by_design
+  outside_polygon_policy: unknown_unlabeled_not_negative
+  historical_chickpea_mask_role: comparison_only_not_a_veto
+  outward_uncertainty_tolerance_m: 0.05
+  soil_ndvi_threshold: 0.30
+  explicit_alley_precedence: true
+  tyre_tracks_change_labels: false
+  polygon_core_vegetation_status: candidate_pending_spectral_weed_separation
+  outward_edge_belt_status: uncertain_pending_stronger_spectral_evidence
+  automatically_materialize_masks: false
+
+# Direct (NIR-red)/(NIR+red) on the stored reflectance values produced no
+# soil anywhere, including outside the investigator polygons. It is retained
+# only as a diagnostic until the original NDVI source/scaling is reconciled.
+polygon_soil_source_audit:
+  soil_ndvi_threshold: 0.30
+  raw_reflectance_dn_ndvi_role: diagnostic_only_not_a_label_source
+  preferred_existing_source: provenance_tracked_soil_mask
+  inventory_stored_ndvi_products: true
+  infer_unknown_ndvi_scaling: false
+  label_expansion_cubes_without_validated_soil_source_remain_unresolved: true
+  automatically_materialize_masks: false
+
+
+# The stored files named NDVI/NVDI contain no physical pixels below 0.30.
+# Treat their values as an uninterpreted index and accept a transferred soil
+# rule only if its direction and threshold generalize to held-out cubes.
+stored_index_soil_separability_audit:
+  maximum_sampled_pixels_per_class_per_cube: 20000
+  seed: 42
+  minimum_loco_auc: 0.75
+  minimum_loco_balanced_accuracy: 0.70
+  direction_must_be_stable: true
+  exclude_phenology_sensitivity_cubes_from_threshold_fitting: true
+  automatically_materialize_masks: false
+
+# Enabled only after the stored scalar-index rule passed leave-one-cube-out
+# transfer validation. Existing cubes keep their provenance-tracked soil masks;
+# the calibrated index supplies review-only soil candidates only for 12/14/15.
+polygon_guided_candidate_materialization:
+  status: review_only_not_authoritative
+  outward_uncertainty_tolerance_m: 0.05
+  existing_cube_soil_source: provenance_tracked_authoritative_soil_mask
+  expansion_cube_soil_source: validated_uninterpreted_scalar_index_review_rule
+  output_root_relative: data/processed/polygon_guided_mask_candidates
+  explicit_alley_precedence: true
+  tyre_tracks_change_labels: false
+  automatically_replace_authoritative_masks: false
+  automatically_retrain_models: false
+
+# Polygon and soil evidence define where vegetation may be evaluated; they do
+# not make every remaining pixel chickpea. Historical categorical labels are
+# used only as weak audit references where they agree with the polygon core.
+polygon_guided_vegetation_separability_audit:
+  spectral_band_section: primary
+  maximum_reference_pixels_per_class_per_cube: 5000
+  maximum_projection_pixels_per_cube_for_summary: 50000
+  prediction_chunk_size: 50000
+  seed: 42
+  logistic_regularization_c: 1.0
+  maximum_iterations: 500
+  minimum_mean_loco_auc: 0.75
+  minimum_mean_loco_balanced_accuracy: 0.70
+  minimum_fraction_heldout_cubes_passing_balanced_accuracy: 0.70
+  weak_reference_role: audit_only_not_ground_truth
+  sensitivity_cubes_are_reference_excluded: true
+  expansion_cubes_are_projection_only: true
+  write_probability_geotiffs: false
+  automatically_materialize_chickpea_or_weed_masks: false
+  automatically_replace_authoritative_masks: false
+  automatically_retrain_models: false
+
+# The weak historical chickpea/weed references failed cross-cube transfer
+# (mean LOCO AUC 0.5707; balanced accuracy 0.5462). Investigator-confirmed
+# points now replace those masks as the next spectral-reference source.
+investigator_vegetation_reference_annotation:
+  status: required_after_weak_reference_gate_failure
+  reference_types: [confirmed_chickpea, confirmed_weed, uncertain_do_not_use]
+  target_points_per_class_per_primary_cube: 10
+  default_sample_radius_m: 0.03
+  permitted_sample_radii_m: [0.00, 0.03, 0.05]
+  primary_candidate_cubes_only_for_model_fitting: true
+  label_expansion_cubes_are_projection_only: true
+  phenology_sensitivity_cubes_are_diagnostic_only: true
+  existing_row_and_planter_annotations_are_locked_context: true
+  historical_masks_are_not_reference_truth: true
+  automatically_materialize_masks: false
+  automatically_retrain_models: false
+
+# Each investigator point is one independent reference observation. Spectra
+# within its circle are filtered for soil/NoData and reduced to a bandwise
+# median before leave-one-cube-out validation.
+investigator_vegetation_reference_audit:
+  spectral_band_section: primary
+  minimum_points_per_class_per_primary_cube: 10
+  minimum_usable_points_per_class_per_primary_cube: 5
+  minimum_usable_pixels_per_reference: 3
+  logistic_regularization_c: 1.0
+  maximum_iterations: 1000
+  seed: 42
+  minimum_mean_loco_auc: 0.75
+  minimum_mean_loco_balanced_accuracy: 0.70
+  minimum_fraction_heldout_cubes_passing_balanced_accuracy: 0.70
+  chickpea_centres_must_be_polygon_core_nonsoil: false
+  weed_centres_must_be_outside_chickpea_core: false
+  polygon_and_centre_soil_checks_role: diagnostic_not_reference_veto
+  investigator_confirmed_class_is_reference_authority: true
+  exclude_soil_and_nodata_pixels_before_aggregation: true
+  historical_chickpea_and_weed_masks_are_not_reference_truth: true
+  write_probability_geotiffs: false
+  automatically_materialize_masks: false
+  automatically_retrain_models: false
+
+# Freeze only after the investigator-point audit passes its predeclared
+# cross-cube transfer gates. Per-cube failures remain explicit diagnostics and
+# are never silently removed from the accepted reference evidence.
+investigator_vegetation_reference_freeze:
+  status: accepted_pending_contract_materialization
+  source_report_relative: reports/mask_refinement/investigator_vegetation_reference_audit
+  audit_contract_filename: field1_investigator_vegetation_reference_audit_contract.yaml
+  frozen_contract_filename: field1_investigator_vegetation_reference_contract.yaml
+  frozen_points_filename: field1_investigator_vegetation_reference_points.csv
+  frozen_qc_filename: field1_investigator_vegetation_reference_qc.csv
+  frozen_loco_filename: field1_investigator_vegetation_reference_loco_validation.csv
+  frozen_spectral_profile_filename: field1_investigator_vegetation_reference_spectral_profile.csv
+  frozen_visual_filename: field1_investigator_vegetation_reference_overview.png
+  minimum_usable_points_per_class_per_cube: 5
+  minimum_mean_loco_auc: 0.75
+  minimum_mean_loco_balanced_accuracy: 0.70
+  minimum_fraction_heldout_cubes_passing_balanced_accuracy: 0.70
+  per_cube_balanced_accuracy_warning_threshold: 0.70
+  per_cube_auc_warning_threshold: 0.75
+  downstream_use: polygon_constrained_probability_review_only
+  automatically_materialize_categorical_masks: false
+  automatically_replace_authoritative_masks: false
+  automatically_retrain_models: false
+
+# Continuous review rasters are permitted only after the investigator point
+# contract is frozen. The same bandwise-median neighbourhood representation is
+# used for both the frozen references and every scored candidate centre.
+investigator_vegetation_probability_review:
+  status: enabled_after_reference_contract_freeze
+  reference_contract_filename: field1_investigator_vegetation_reference_contract.yaml
+  candidate_contract_filename: field1_polygon_guided_candidate_materialization_contract.yaml
+  spectral_band_section: primary
+  dense_neighbourhood_radius_m: 0.03
+  minimum_usable_pixels_per_neighbourhood: 3
+  prediction_chunk_size: 2500
+  score_candidate_support_codes: [2, 4]
+  probability_nodata_value: -9999.0
+  logistic_regularization_c: 1.0
+  maximum_iterations: 1000
+  seed: 42
+  output_root_relative: data/processed/investigator_chickpea_probability_review
+  write_continuous_probability_geotiffs: true
+  probability_threshold_is_a_class_label: false
+  automatically_materialize_categorical_masks: false
+  automatically_replace_authoritative_masks: false
+  automatically_retrain_supervised_models: false
+
+# Continuous probabilities are audited as a three-way review triage, never as
+# a categorical mask. Threshold performance is estimated only from held-out
+# investigator points; dense-pixel precision is not assumed from point-level
+# precision. Cube 32 remains an explicit transfer warning.
+investigator_probability_threshold_audit:
+  status: enabled_after_probability_review_contract
+  probability_contract_filename: field1_investigator_chickpea_probability_review_contract.yaml
+  reference_contract_filename: field1_investigator_vegetation_reference_contract.yaml
+  chickpea_threshold_candidates: [0.70, 0.80, 0.85]
+  weed_threshold_candidates: [0.15, 0.20, 0.30]
+  display_chickpea_threshold: 0.80
+  display_weed_threshold: 0.15
+  minimum_point_precision_for_display_threshold: 0.95
+  minimum_point_precision_wilson_lower_95: 0.90
+  transfer_warning_cubes_remain_unresolved: true
+  write_categorical_geotiffs: false
+  automatically_materialize_masks: false
+  automatically_replace_authoritative_masks: false
+  automatically_retrain_models: false
+
+# Materialize the accepted threshold audit as an explicitly review-only layer.
+# Soil and alleys preserve precedence, polygon-edge pixels remain unresolved,
+# and any frozen transfer-warning cube is barred from automatic decisions.
+investigator_mask_review_candidate:
+  status: enabled_after_threshold_audit_gate
+  threshold_contract_filename: field1_investigator_probability_threshold_audit_contract.yaml
+  probability_contract_filename: field1_investigator_chickpea_probability_review_contract.yaml
+  candidate_contract_filename: field1_polygon_guided_candidate_materialization_contract.yaml
+  output_root_relative: data/processed/investigator_mask_review_candidates
+  chickpea_decision_eligible_roles: [primary_candidate, label_expansion_candidate]
+  weed_decision_eligible_roles: [primary_candidate]
+  incomplete_positive_support_cubes: [field1_cube12, field1_cube14, field1_cube15]
+  outside_polygon_action: unresolved_not_negative
+  weed_maximum_probability: 0.15
+  chickpea_minimum_probability: 0.80
+  polygon_edge_action: unresolved
+  transfer_warning_action: unresolved
+  nonprimary_role_action: diagnostic_only
+  write_review_only_geotiffs: true
+  automatically_accept_review_candidates: false
+  automatically_replace_authoritative_masks: false
+  automatically_retrain_models: false
+
+# Before any review code can become a training label, render it directly over
+# the same observed NIR-red-green imagery used for investigator annotation.
+# The generated inventory starts with every cube pending visual acceptance.
+investigator_mask_acceptance_review:
+  status: enabled_after_review_candidate_materialization
+  candidate_contract_filename: field1_investigator_mask_review_candidate_contract.yaml
+  annotation_layer_manifest_relative: metadata/local/reports/chickpea_region_annotation/chickpea_region_annotation_layer_manifest.csv
+  trusted_expansion_cubes: [field1_cube12, field1_cube14, field1_cube15]
+  decision_overlay_alpha: 0.72
+  uncertainty_overlay_alpha: 0.68
+  automatically_accept_review_candidates: false
+  automatically_replace_authoritative_masks: false
+  automatically_retrain_models: false
+
+# Investigator visual acceptance applies only to conservative positive support
+# in the trusted expansion cubes. Value 1 means confirmed chickpea support;
+# value 0 remains unknown/unlabeled and must never be interpreted as non-crop.
+trusted_expansion_chickpea_freeze:
+  status: investigator_accepted_after_imagery_review
+  acceptance_contract_filename: field1_investigator_mask_acceptance_review_contract.yaml
+  candidate_contract_filename: field1_investigator_mask_review_candidate_contract.yaml
+  accepted_cubes: [field1_cube12, field1_cube14, field1_cube15]
+  accepted_review_code: 4
+  positive_support_value: 1
+  unknown_unlabeled_value: 0
+  output_root_relative: data/processed/trusted_expansion_chickpea_positive_support
+  outside_polygon_action: unknown_unlabeled
+  unresolved_pixel_action: unknown_unlabeled
+  infer_weed_labels: false
+  replace_authoritative_masks: false
+  retrain_models: false

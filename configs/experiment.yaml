@@ -1,0 +1,33 @@
+seed: 42
+data:
+  manifest: metadata/local/field1_manifest.csv
+  patch_size: 15
+  channels: [reflectance]
+  vegetation_only: true
+  cluster_target: weed
+  split_group: spatial_block
+  valid_fraction: 0.2
+  synthetic_data_allowed: false
+  field2_locked: true
+model:
+  method: simclr
+  encoder: resnet18
+  embedding_dim: 128
+  projection_dim: 128
+training:
+  epochs: 100
+  batch_size: 256
+  learning_rate: 0.0003
+  weight_decay: 0.0001
+  num_workers: 8
+  mixed_precision: true
+clustering:
+  candidates: [2, 3, 4, 5, 6, 7, 8]
+  seeds: [11, 23, 42, 71, 101]
+  algorithm: kmeans
+validation:
+  supervised_labels: [soil, chickpea, weed]
+  external_class: tall_grass
+  bootstrap_repeats: 1000
+  reveal_field2_labels_after_freeze: true
+output_dir: results/ssl_baseline

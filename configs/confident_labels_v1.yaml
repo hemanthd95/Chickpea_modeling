@@ -1,0 +1,67 @@
+version: field1_confident_labels_v1
+status: candidate_pending_validation
+field: Field 1
+field2_locked: true
+
+class_mapping:
+  soil: 0
+  chickpea: 1
+  weed: 2
+  unresolved: 255
+
+probability:
+  weed_maximum: 0.15
+  chickpea_minimum: 0.80
+  reference_band_section: primary
+  neighbourhood_radius_m: 0.03
+  minimum_usable_pixels: 3
+  prediction_chunk_size: 50000
+  logistic_regularization_c: 1.0
+  maximum_iterations: 1000
+  seed: 42
+
+geometry:
+  polygon_edge_tolerance_m: 0.05
+  alley_inward_buffer_m: 0.05
+  alley_inward_buffer_sensitivity_m: [0.00, 0.03, 0.05, 0.10]
+  annotation_seam_snap_m: 0.30
+
+cube_roles:
+  sensitivity_only: [field1_cube24, field1_cube28]
+  expansion_only: [field1_cube12, field1_cube14, field1_cube15]
+  transfer_warning_dense_sensitivity_only: [field1_cube32]
+
+sampling:
+  seed: 42
+  patch_size_pixels: 15
+  minimum_separation_m: 0.15
+  ground_cell_resolution_m: 0.015
+  training_per_class: 20000
+  inner_validation_per_class: 5000
+  maximum_candidates_per_cube_group_class_source: 1000
+
+normalization:
+  samples_per_cube: 20000
+  seed: 42
+  band_section: primary
+
+training:
+  architecture: center_context_fusion
+  outer_folds: [1, 2, 3, 4, 5]
+  seeds: [42, 43, 44]
+  gpu_indices: [0, 1]
+  epochs: 15
+  minimum_epochs: 6
+  early_stopping_patience: 4
+  early_stopping_minimum_delta: 0.001
+  batch_size_candidates: [256, 512, 1024]
+  learning_rate: 0.0003
+  weight_decay: 0.0001
+  num_workers: 8
+  prefetch_factor: 2
+  log_every_batches: 25
+  mixed_precision: true
+
+output_root: data/processed/field1_confident_labels_v1
+report_root: metadata/local/reports/confident_labels_v1
+contract_root: metadata/local/contracts/confident_labels_v1

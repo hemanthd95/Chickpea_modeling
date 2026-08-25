@@ -1,6 +1,4 @@
-# ----------------------------
 # Large remote sensing / hyperspectral data
-# ----------------------------
 *.tif
 *.tiff
 *.img
@@ -19,24 +17,16 @@
 *.pix
 *.envi
 *.sav
-
-# Common imagery formats (if large)
 *.jp2
-
-# LiDAR / point clouds
 *.las
 *.laz
-
-# Archives
 *.zip
 *.7z
 *.tar
 *.gz
 *.rar
 
-# ----------------------------
-# Data directories (adjust to your structure)
-# ----------------------------
+# Data and generated outputs
 data/
 Data/
 raw/
@@ -54,26 +44,21 @@ results/
 Results/
 runs/
 logs/
+metadata/local/
+configs/paths.local.yaml
 
-# ----------------------------
-# Python / notebooks
-# ----------------------------
+# Python, environments, checkpoints
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
-
-# Environments
 .venv/
 venv/
 env/
 conda_env/
 *.conda
-
-# ML checkpoints
 *.ckpt
 *.pth
 *.pt
-*.h5
 *.joblib
 
 # OS/editor

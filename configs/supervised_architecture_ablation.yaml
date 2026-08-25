@@ -1,0 +1,25 @@
+diagnostic_only: true
+run_title: Fold-1 center-aware supervised architecture ablation
+report_stage: models/supervised_architecture_ablation_fold1
+seed_for_observed_sample_selection: 42
+model_seeds: [42, 43, 44]
+heldout_fold: 1
+samples_per_training_class: 20000
+samples_per_validation_class: 5000
+architectures:
+  - center_spectrum_mlp
+  - spatial_average_cnn
+  - center_context_fusion
+training:
+  epochs: 15
+  minimum_epochs: 6
+  early_stopping_patience: 4
+  early_stopping_minimum_delta: 0.001
+  batch_size: 256
+  learning_rate: 0.0003
+  weight_decay: 0.0001
+  num_workers: 8
+  log_every_batches: 100
+  mixed_precision: true
+  gpu_index: 1
+output_dir: results/supervised_architecture_ablation_fold1

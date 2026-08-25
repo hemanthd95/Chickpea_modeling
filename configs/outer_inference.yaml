@@ -1,0 +1,58 @@
+status: engineering_pilot_before_primary_outer_evaluation
+field: Field 1
+field2_locked: true
+
+pilot:
+  architecture: center_context_fusion
+  maximum_observed_centers: 20000
+  batch_sizes: [256, 512, 1024]
+  mixed_precision: true
+  maximum_peak_memory_gib: 24.0
+
+primary:
+  seed_ensemble: arithmetic_mean_of_softmax_probabilities
+  save_individual_pixel_probabilities: false
+  accumulate_confusion_by:
+    - outer_fold
+    - frozen_5m_spatial_group
+    - cube
+  cluster_bootstrap_replicates: 1000
+  cluster_bootstrap_seed: 42
+  field2_locked: true
+
+evaluation:
+  gpu_indices: [0, 1]
+  mixed_precision: true
+  bootstrap_replicates: 1000
+  bootstrap_seed: 42
+
+overlap_sensitivity:
+  status: predeclared_before_ground_cell_audit
+  native_gsd_multipliers: [1.0, 2.0]
+  anchor_x_m: 0.0
+  anchor_y_m: 0.0
+  selection_rule: first_observation_in_lexicographic_cube_id_order
+  model_selection_from_sensitivity_results: prohibited
+  field2_locked: true
+
+overlap_label_consistency:
+  status: predeclared_before_label_consistency_audit
+  native_gsd_multiplier: 1.0
+  interior_neighbourhood_radius_pixels: 2
+  report_cross_cube_and_within_cube_separately: true
+  modify_authoritative_labels: false
+  field2_locked: true
+
+overlap_model_sensitivity:
+  status: frozen_before_overlap_sensitivity_inference
+  ground_cell_scale: 1.0_native_median_gsd
+  populations:
+    - first_view
+    - unanimous_label
+  first_view_rule: first_observation_in_lexicographic_cube_id_order
+  unanimous_label_rule: retain_unique_cells_and_repeated_cells_only_when_all_labels_agree
+  conflicting_repeated_cells: exclude_from_unanimous_population
+  architectures: all_frozen_supervised_architectures
+  retraining: prohibited
+  model_selection_from_sensitivity_results: prohibited
+  field2_locked: true

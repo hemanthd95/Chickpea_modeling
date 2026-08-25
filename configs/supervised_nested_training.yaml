@@ -1,0 +1,20 @@
+base_training_config: configs/supervised_architecture_ablation.yaml
+primary_protocol_contract: field1_supervised_primary_evaluation_protocol.yaml
+nested_sample_file: field1_nested_model_samples.csv
+nested_sample_contract: field1_nested_model_samples_contract.yaml
+nested_normalization_file: field1_nested_normalization.csv
+nested_normalization_contract: field1_nested_normalization_contract.yaml
+
+outer_folds: [1, 2, 3, 4, 5]
+gpu_indices: [0, 1]
+skip_completed_folds: true
+
+architectures:
+  - center_spectrum_mlp
+  - spatial_average_cnn
+  - center_context_fusion
+model_seeds: [42, 43, 44]
+
+per_fold_report_stage: models/supervised_nested_training/folds
+aggregate_report_stage: models/supervised_nested_training
+per_fold_output_dir: results/supervised_nested_training

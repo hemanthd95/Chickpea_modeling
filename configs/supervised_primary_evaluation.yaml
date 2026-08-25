@@ -1,0 +1,80 @@
+status: proposed_for_freezing
+field: Field 1
+field2_locked: true
+
+outer_folds: [1, 2, 3, 4, 5]
+inner_validation_by_outer_fold:
+  1: 2
+  2: 3
+  3: 4
+  4: 5
+  5: 1
+
+architectures:
+  - center_spectrum_mlp
+  - spatial_average_cnn
+  - center_context_fusion
+primary_architecture: center_context_fusion
+model_seeds: [42, 43, 44]
+
+training:
+  samples_per_training_class: 20000
+  samples_per_inner_validation_class: 5000
+  patch_size_pixels: 15
+  use_only_observed_patches: true
+  class_balanced_training: true
+  early_stopping_metric: inner_validation_macro_f1
+  outer_fold_visible_during_training: false
+  normalization_scope: outer_and_inner_folds_excluded
+
+outer_evaluation:
+  prediction_unit: all_eligible_authoritative_labeled_pixel_observations
+  seed_ensemble: arithmetic_mean_of_softmax_probabilities
+  primary_summary: equal_weight_spatial_group_metrics
+  secondary_summary:
+    - pixel_observation_weighted_metrics
+    - cube_level_metrics
+    - fold_level_metrics
+    - one_observation_per_ground_cell_sensitivity
+  metrics:
+    - confusion_matrix
+    - balanced_accuracy
+    - macro_f1
+    - per_class_precision
+    - per_class_recall
+    - per_class_f1
+  spatial_cluster_bootstrap:
+    enabled: true
+    cluster_unit: frozen_5m_spatial_group
+    replicates: 1000
+    seed: 42
+    confidence_level: 0.95
+  minimum_class_support_for_cube_macro_f1: 1
+  cubes_missing_any_class:
+    report_support: true
+    exclude_from_three_class_cube_macro_f1: true
+  overlap_sensitivity:
+    primary_keeps_repeated_cube_observations_with_group_equal_weighting: true
+    deterministic_ground_cell_analysis: true
+  chickpea_geometry:
+    unconstrained_predictions_are_primary: true
+    plot_and_alley_constraints_are_sensitivity_only: true
+
+prohibited:
+  - outer_fold_early_stopping
+  - outer_fold_threshold_tuning
+  - architecture_switching_after_outer_results
+  - pixel_level_bootstrap_as_independent_samples
+  - Field_2_access_before_Field_1_pipeline_freeze
+  - synthetic_scientific_observations
+
+source_contracts:
+  spatial_folds: field1_spatial_fold_contract.yaml
+  fold_normalization: field1_fold_normalization_contract.yaml
+  training_candidates: field1_training_candidate_contract.yaml
+  architecture_selection: field1_supervised_architecture_contract.yaml
+  balanced_development_benchmark: field1_supervised_fivefold_balanced_contract.yaml
+
+contract_filename: field1_supervised_primary_evaluation_protocol.yaml
+role_table_filename: field1_nested_fold_roles.csv
+visual_filename: field1_nested_evaluation_protocol.png

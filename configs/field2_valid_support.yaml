@@ -1,0 +1,80 @@
+version: field2_valid_support_v1
+field_identifier: Field 2
+readiness_contract: metadata/local/contracts/field2_georectified_inventory_contract.yaml
+readiness_repository_commit: 1f52c744a2b4d0a7065302e4f4f2377a3d17603f
+readiness_inventory: metadata/local/reports/field2_readiness/field2_georectified_inventory.csv
+readiness_alignment: metadata/local/reports/field2_readiness/field2_spatial_alignment_audit.csv
+field1_wavelength_contract: metadata/local/contracts/field1_fold_normalization.csv
+output_root: metadata/local/reports/field2_valid_support
+contract_path: metadata/local/contracts/field2_valid_support_contract.yaml
+temporary_root: metadata/local/tmp/field2_valid_support
+mask_root: data/processed/field2_valid_support_v1
+
+authorized_root_names:
+  reflectance: Field_2_Georectified
+  pca: Field_2_Geo_PCA
+  stored_index: Field_2_Geo_NDVI
+
+model_input_bands:
+  indexing: zero_based_python_inclusive
+  first_index: 3
+  last_index_inclusive: 113
+  envi_first_band_one_based: 4
+  envi_last_band_one_based_inclusive: 114
+  expected_count: 111
+  wavelength_tolerance_nm: 0.05
+
+rules:
+  primary: finite_positive_norm_gt_0
+  selected_robust: finite_positive_norm_gt_1
+  positive_norm_thresholds_stored_units: [0, 1, 5, 10]
+  low_amplitude_upper_bound_stored_units: 10
+
+processing:
+  row_window_size: 64
+  component_connectivity: 8
+  small_component_max_pixels: 25
+  preview_max_dimension: 700
+  preview_percentiles: [2.0, 98.0]
+  false_colour_wavelengths_nm: [800.0, 670.0, 550.0]
+
+freeze_gates:
+  expected_cube_count: 40
+  maximum_primary_robust_disagreement_fraction: 0.001
+  minimum_largest_component_fraction: 0.90
+  maximum_non_small_interior_component_count: 0
+  maximum_small_component_pixel_fraction: 0.0001
+  require_exact_grid_identity: true
+
+spatial_review:
+  reviewed_exceptions:
+    field2_cube02:
+      expected_component_count: 5
+      permitted_non_small_interior_component_count: 1
+      rationale: >-
+        Visual review of the prediction-free false-colour reflectance and raw
+        component map shows a coherent 12,254-pixel upper scan strip separated
+        from the main footprint by a zero-filled scan gap. It is retained as
+        observed reflectance support; no morphology or component filtering is
+        applied. Two other non-small components touch the raster boundary, and
+        the two remaining components contain only 14 and 15 pixels.
+
+mask:
+  valid_code: 1
+  invalid_code: 0
+  driver: GTiff
+  compression: DEFLATE
+  predictor: 2
+  zlevel: 9
+
+safety:
+  gdal_pam_enabled: "NO"
+  source_open_mode: read_only
+  numpy_memmap_mode: r
+  reject_outputs_inside_source_roots: true
+  reflectance_only_rule: true
+  predictions_prohibited: true
+  probabilities_prohibited: true
+  labels_prohibited: true
+  pca_or_index_in_rule_prohibited: true
+  training_prohibited: true
