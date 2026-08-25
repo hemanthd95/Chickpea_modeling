@@ -1,0 +1,88 @@
+version: field2_area_stratified_sampling_v2
+field_identifier: Field 2
+base_config: configs/field2_blind_evaluation.yaml
+area_config: configs/field2_area_annotation.yaml
+
+sampling:
+  seed: 20260825
+  spatial_group_size_m: 5.0
+  minimum_separation_m: 0.25
+  geographic_ground_cell_size_m: 0.10
+  annotation_context_radius_preview_pixels: 0
+  scalar_index_rank_strata:
+    - rank_00_20
+    - rank_20_40
+    - rank_40_60
+    - rank_60_80
+    - rank_80_100
+  domains:
+    research_crop_area:
+      main_total: 400
+      reserve_total: 200
+      eligible_role: primary_three_class
+      main_base: 28
+      main_remainder: 8
+      reserve_base: 14
+      reserve_remainder: 4
+    alley:
+      main_total: 160
+      reserve_total: 80
+      main_base: 4
+      main_remainder: 12
+      reserve_base: 2
+      reserve_remainder: 6
+    outside_research_field:
+      main_total: 120
+      reserve_total: 60
+      guaranteed_cubes:
+        field2_cube38: {main: 10, reserve: 5}
+        field2_cube41: {main: 10, reserve: 5}
+        field2_cube42: {main: 10, reserve: 5}
+    unassigned_valid_support:
+      main_total: 120
+      reserve_total: 60
+      guaranteed_cubes:
+        field2_cube09: {main: 10, reserve: 5}
+        field2_cube11: {main: 10, reserve: 5}
+        field2_cube17: {main: 10, reserve: 5}
+        field2_cube18: {main: 10, reserve: 5}
+        field2_cube19: {main: 10, reserve: 5}
+        field2_cube20: {main: 10, reserve: 5}
+  expected_main_total: 800
+  expected_reserve_total: 400
+  exclude_v1_ground_cells_when_feasible: true
+  reserve_release_policy: separate_immutable_authorization_required
+
+outputs:
+  root: metadata/local/annotations/field2_area_sampling_v2
+  main_frame: field2_area_sampling_v2_main.csv
+  reserve_frame: field2_area_sampling_v2_reserve_locked.csv
+  combined_frame: field2_area_sampling_v2_combined.csv
+  report_root: metadata/local/reports/field2_area_sampling_v2
+  allocation_audit: allocation_by_cube_role_domain_rank_block.csv
+  crop_eligibility: crop_sampling_eligibility.csv
+  capacity_audit: feasible_capacity_by_cube_domain.csv
+  redistribution_audit: allocation_redistribution.csv
+  v1_intersection_audit: v1_v2_ground_cell_intersection.csv
+  main_reserve_intersection_audit: main_reserve_intersection.csv
+  compliance_audit: valid_support_area_domain_compliance.csv
+  nearest_neighbor_audit: nearest_neighbor_distances.csv
+  crop_polygon_coverage: crop_polygon_coverage.csv
+  sampling_audit: field2_area_sampling_v2_audit.yaml
+  sampling_map: field2_area_sampling_v2_overview.png
+  contract: metadata/local/contracts/field2_area_sampling_v2_contract.yaml
+  amendment: metadata/local/contracts/field2_blind_sampling_v1_supersession_amendment.yaml
+  sha256_manifest: metadata/local/contracts/field2_area_sampling_v2_sha256_manifest.csv
+
+point_annotation:
+  output_root: metadata/local/annotations/field2_area_sampling_v2_points
+  port: 8773
+
+safety:
+  source_open_mode: read_only
+  reserve_api_exposure: false
+  biological_labels_preselected: false
+  predictions_prohibited: true
+  probabilities_from_models_prohibited: true
+  checkpoints_prohibited: true
+  field1_outputs_prohibited: true

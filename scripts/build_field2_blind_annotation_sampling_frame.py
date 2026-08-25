@@ -158,7 +158,10 @@ def nearest_neighbor_summary(frame: pd.DataFrame) -> dict[str, float]:
     return {"minimum_m": float(np.min(distances)), "median_m": float(np.median(distances)), "maximum_m": float(np.max(distances))}
 
 
-def save_sampling_map(path: Path, manifest: pd.DataFrame, combined: pd.DataFrame, project: Path) -> None:
+def save_sampling_map(
+    path: Path, manifest: pd.DataFrame, combined: pd.DataFrame, project: Path,
+    include_reserve: bool = True,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig, axes = plt.subplots(5, 8, figsize=(20, 13), constrained_layout=True)
     by_cube = {str(row.cube_id): row for row in manifest.itertuples(index=False)}
@@ -166,12 +169,16 @@ def save_sampling_map(path: Path, manifest: pd.DataFrame, combined: pd.DataFrame
         row = by_cube[cube_id]
         axis.imshow(plt.imread(project / str(row.false_colour_path)))
         points = combined[combined.cube_id == cube_id]
-        for name, marker, color in (("main", "o", "#ff2d55"), ("reserve", "x", "#00e5ff")):
+        frames = (("main", "o", "#ff2d55"), ("reserve", "x", "#00e5ff")) if include_reserve else (("main", "o", "#ff2d55"),)
+        for name, marker, color in frames:
             selected = points[points.sampling_frame == name]
             axis.scatter((selected.column + .5) / int(row.preview_step), (selected.row + .5) / int(row.preview_step), s=18 if name == "main" else 23, marker=marker, c=color, linewidths=1.1, label=name)
         axis.set_title(cube_id, fontsize=8); axis.set_xticks([]); axis.set_yticks([])
     axes.flat[0].legend(loc="lower right", fontsize=6)
-    fig.suptitle("Field 2 prediction-free blind sampling — main circles / locked reserve crosses")
+    fig.suptitle(
+        "Field 2 prediction-free blind sampling — main circles / locked reserve crosses"
+        if include_reserve else "Field 2 prediction-free area-stratified v2 — MAIN points only; reserve coordinates omitted"
+    )
     descriptor, name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".png", dir=path.parent)
     os.close(descriptor); temporary = Path(name)
     try:

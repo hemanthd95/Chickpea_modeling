@@ -1025,3 +1025,24 @@ corrections.
 - All 57 focused tests, 123 repository tests, and every frozen Field 1/Field 2
   validator passed. No checkpoint, model, prediction, probability, threshold
   suggestion, pseudo-label, or automatic biological label was used.
+
+## 2026-08-25
+
+### Frozen capacity-aware Field 2 area-stratified sampling v2
+
+- Preserved all frozen roles while deriving 14 crop-sampling-eligible primary
+  cubes and retaining six zero-crop-support cubes in the 20-cube primary set.
+- Froze exactly 800 main points (400 crop, 160 alley, 120 outside, 120 unassigned)
+  and 400 locked reserve points (200/80/60/60), with deterministic same-domain
+  capacity redistribution and no domain substitution.
+- Excluded every v1 ground cell, preserved v1 frames and neutral annotations
+  byte-for-byte, and recorded their pre-biological-annotation supersession in an
+  immutable amendment.
+- Added capacity, eligibility, redistribution, intersection, compliance,
+  separation, inclusion-weight, crop-component, deterministic-hash, and main-only
+  preview audits. Reserve coordinates remain absent from APIs and previews.
+- Added a separate neutral v2 point-annotation namespace serving 800 main and zero
+  reserve records with natural RGB default, frozen domain/role display, spectra,
+  and non-chickpea-domain label restrictions.
+- Focused tests passed 61/61 and the full repository suite passed 127/127; all
+  frozen Field 1/Field 2 validators passed without model or checkpoint use.
